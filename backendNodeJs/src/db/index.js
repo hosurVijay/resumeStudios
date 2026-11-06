@@ -1,27 +1,25 @@
 import mysql from "mysql2";
+
 const connectionInstance = mysql.createConnection({
-  host: process.env.DB_HOST,
-  password: process.env.DB_PASSWORD,
-  user: process.env.DB_USER,
-  port: process.env.DB_PORT,
-  database: process.env.DB_DATABASE,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  host: process.env.DB_HOST || "127.0.0.1",
+  port: Number(process.env.DB_PORT) || 3306,
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_DATABASE || "resume_studio",
+  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined,
 });
 
 export const db = connectionInstance.promise();
-export const connectDb = async () => {
-  try {
+
+export const connectDb = () => {
+  return new Promise((resolve, reject) => {
     connectionInstance.connect((err) => {
-      if (!err) {
-        console.log("MySql connection successful");
-      } else {
-        console.log("MySql connection error", err);
+      if (err) {
+        console.error("MySQL connection error:", err.message);
+        return reject(err);
       }
+      console.log("MySQL connection successful");
+      resolve();
     });
-  } catch (error) {
-    console.log("COnnection with mysql failed!, Try again", error);
-    process.exit(1);
-  }
+  });
 };

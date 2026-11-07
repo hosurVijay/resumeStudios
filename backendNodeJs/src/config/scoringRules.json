@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "mandatoryMultiplier": 2.0,
+  "partialCredit": 0.5,
+  "thresholds": {
+    "strong": 75,
+    "developing": 50
+  },
+  "rules": [
+    {
+      "id": "exp-years",
+      "type": "years",
+      "label": "Years of Relevant Experience",
+      "weight": 15,
+      "suggestion": "State your total years of experience explicitly in your summary or work history."
+    },
+    {
+      "id": "sec-core",
+      "type": "sections",
+      "label": "Standard Resume Structure",
+      "weight": 10,
+      "always": true,
+      "terms": ["experience", "education", "skills"],
+      "suggestion": "Ensure your resume clearly labels Experience, Education, and Skills sections."
+    },
+    {
+      "id": "tech-js",
+      "type": "term",
+      "label": "JavaScript / TypeScript",
+      "weight": 10,
+      "terms": ["javascript", "typescript", "es6", "node.js"],
+      "suggestion": "Include evidence of JavaScript/TypeScript development and key libraries used."
+    },
+    {
+      "id": "tech-react",
+      "type": "term",
+      "label": "React Ecosystem",
+      "weight": 10,
+      "terms": ["react", "react.js", "next.js", "redux"],
+      "suggestion": "Highlight frontend React projects, state management, or component architectures."
+    },
+    {
+      "id": "tech-backend",
+      "type": "term",
+      "label": "Backend API Development",
+      "weight": 10,
+      "terms": ["express", "fastapi", "rest api", "graphql", "microservices"],
+      "suggestion": "Demonstrate backend RESTful or GraphQL API design and implementation."
+    },
+    {
+      "id": "tech-database",
+      "type": "term",
+      "label": "Database Design & SQL",
+      "weight": 10,
+      "terms": ["sql", "mysql", "postgresql", "mongodb", "database"],
+      "suggestion": "Mention specific databases, schema design, or query optimization experience."
+    },
+    {
+      "id": "tech-cloud",
+      "type": "term",
+      "label": "Cloud & Containerization",
+      "weight": 8,
+      "terms": ["docker", "kubernetes", "aws", "gcp", "azure", "ci/cd"],
+      "suggestion": "Add concrete examples of containerization, cloud deployment, or CI/CD pipelines."
+    }
+  ]
+}

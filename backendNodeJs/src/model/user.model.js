@@ -28,7 +28,7 @@ const findUserByEmail = async (email) => {
             WHERE email = ? 
         `;
     const [result] = await db.execute(query, [email]);
-    return result;
+    return result[0] || null;
   } catch (error) {
     console.log("NO user with such email found");
     throw error;
@@ -43,7 +43,7 @@ const findUserById = async (userId) => {
             where id = ?
         `;
     const [result] = await db.execute(query, [userId]);
-    return result;
+    return result[0] || null;
   } catch (error) {
     console.log("NO user with such id found");
     throw error;
@@ -123,7 +123,7 @@ const findLatestPasswordResetOtp = async (userId) => {
 
   const [result] = await db.execute(query, [userId]);
 
-  return result;
+  return result[0] || null;
 };
 
 const incrementOtpAttempts = async (otpId) => {

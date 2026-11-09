@@ -58,15 +58,40 @@ export class TermRule extends Rule {
       return { status: "uncertain", evidence: hits.join(" / ").slice(0, 1000) };
     }
 
-    // Qualification check (e.g., "limited exposure", "basic knowledge", "beginner")
-    const qualifiedRegex = /\b(limited|exposure|beginner|learning|basic|introductory)\b/i;
+    // Qualification check (e.g., "limited exposure", "basic knowledge", "beginner", "still learning")
+    // Note: Do NOT match standalone "learning" as it collides with "machine learning" and "deep learning"
+    const qualifiedRegex = /(?:still\s+learning|currently\s+learning|learning\s+(?:the\s+)?basics?|learning\s+in\s+progress|\blimited\b|\bexposure\b|\bbeginner\b|\bbasics?\b|\bintroductory\b|\bfamiliar\s+with\b)/i;
     const full = positive.filter((s) => !qualifiedRegex.test(s));
 
-    if (full.length > 0) {
-      return { status: "matched", evidence: full.join(" / ").slice(0, 1000) };
-    } else {
+    if (!full.length) {
       return { status: "partial", evidence: positive.join(" / ").slice(0, 1000) };
     }
+
+    // Depth & Project Verification Check:
+    // Distinguish between mere keyword mentions in a skills/tools list vs actual project or work execution.
+    const ACTION_VERB_REGEX = /\b(?:developed|built|designed|implemented|architected|trained|fine[- ]tuned|deployed|optimized|engineered|benchmarked|created|spearheaded|orchestrated|automated|configured|integrated|maintained|scaled|profiled|evaluated|led|analyzed|migrated|refactored|leveraged|resolved|modeled)\b/i;
+
+    const isListingLine = (line) => {
+      const trimmed = line.trim();
+      // Starts with any skill category prefix like "AI/ML:", "Programming:", "Tools:", "Tech Stack:"
+      if (/^[A-Za-z0-9 /&()+_-]{2,30}:\s*/i.test(trimmed)) return true;
+      // List of words separated by commas or bullets without an action verb
+      if (trimmed.split(/[,•|]+/).length >= 3 && !ACTION_VERB_REGEX.test(trimmed)) return true;
+      // Very short line without an action verb
+      if (trimmed.length < 50 && !ACTION_VERB_REGEX.test(trimmed)) return true;
+      return false;
+    };
+
+    const executionHits = full.filter((s) => !isListingLine(s) && ACTION_VERB_REGEX.test(s));
+
+    if (executionHits.length === 0) {
+      return {
+        status: "partial",
+        evidence: `Only listed under skill tools / keywords (${full[0].slice(0, 120)}); missing substantiated project bullet points, execution details, or measurable metrics.`,
+      };
+    }
+
+    return { status: "matched", evidence: executionHits.join(" / ").slice(0, 1000) };
   }
 }
 

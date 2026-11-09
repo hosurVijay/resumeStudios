@@ -226,6 +226,19 @@ export const findResumeVersionById = async (versionId, applicationId, userId) =>
   return rows[0] || null;
 };
 
+export const getLatestTailoredVersion = async (applicationId, userId) => {
+  const query = `
+    SELECT rv.*, ja.target_role, ja.target_company
+    FROM resume_versions rv
+    JOIN job_applications ja ON ja.id = rv.application_id
+    WHERE rv.application_id = ? AND rv.user_id = ?
+    ORDER BY rv.version_number DESC
+    LIMIT 1
+  `;
+  const [rows] = await db.execute(query, [applicationId, userId]);
+  return rows[0] || null;
+};
+
 export const approveResumeVersion = async (versionId, applicationId, userId) => {
   const updateVersionQuery = `
     UPDATE resume_versions

@@ -1,67 +1,266 @@
 {
-  "version": "1.0.0",
-  "mandatoryMultiplier": 2.0,
-  "partialCredit": 0.5,
+  "version": "2.1.0",
+  "mandatoryMultiplier": 3.0,
+  "partialCredit": 0.20,
   "thresholds": {
-    "strong": 75,
-    "developing": 50
+    "strong": 80,
+    "developing": 60
   },
   "rules": [
     {
       "id": "exp-years",
       "type": "years",
       "label": "Years of Relevant Experience",
-      "weight": 15,
-      "suggestion": "State your total years of experience explicitly in your summary or work history."
-    },
-    {
-      "id": "sec-core",
-      "type": "sections",
-      "label": "Standard Resume Structure",
       "weight": 10,
-      "always": true,
-      "terms": ["experience", "education", "skills"],
-      "suggestion": "Ensure your resume clearly labels Experience, Education, and Skills sections."
+      "suggestion": "State your total years of professional commercial experience in the target role explicitly."
     },
     {
-      "id": "tech-js",
+      "id": "exp-production",
       "type": "term",
-      "label": "JavaScript / TypeScript",
+      "label": "Production & Commercial Engineering Experience",
+      "weight": 14,
+      "terms": ["production environment", "commercial experience", "production deployment", "industry experience", "client-facing", "work experience", "enterprise software", "cross-functional team", "production release", "software engineer", "intern", "developer at"],
+      "suggestion": "Demonstrate professional industry experience shipping production-grade software in commercial or enterprise environments."
+    },
+    {
+      "id": "tier1-scale-impact",
+      "type": "term",
+      "label": "Large-Scale Architecture, High Concurrency & Systems Impact",
+      "weight": 14,
+      "terms": ["high concurrency", "distributed systems", "large scale", "millions of users", "billions of requests", "fault tolerant", "multi-region", "high availability", "zero downtime", "low latency", "throughput optimization"],
+      "suggestion": "Provide quantifiable engineering evidence operating distributed systems at high scale and low latency."
+    },
+    {
+      "id": "aiml-frameworks",
+      "type": "term",
+      "label": "Deep Learning & Machine Learning Frameworks (PyTorch / TensorFlow / JAX)",
+      "weight": 14,
+      "terms": ["pytorch", "torch", "tensorflow", "jax", "scikit-learn", "keras", "deep learning", "machine learning", "xgboost", "lightgbm"],
+      "suggestion": "Highlight hands-on model training, optimization, and evaluation using PyTorch, TensorFlow, or JAX."
+    },
+    {
+      "id": "aiml-models-nlp-cv",
+      "type": "term",
+      "label": "Advanced Architectures (Transformers / LLMs / Computer Vision)",
+      "weight": 14,
+      "terms": ["transformers", "transformer", "attention mechanism", "large language model", "llm", "bert", "gpt", "rag", "retrieval augmented", "computer vision", "diffusion", "u-net", "cnn", "segmentation", "object detection", "hugging face", "langchain", "llamaindex", "generative ai"],
+      "suggestion": "Showcase modern architectural implementations (Transformers, LLMs, RAG, or Computer Vision) with concrete performance results."
+    },
+    {
+      "id": "aiml-mlops-serving",
+      "type": "term",
+      "label": "Production MLOps, Model Serving & Deployment",
+      "weight": 14,
+      "terms": ["mlops", "model serving", "triton", "tensorrt", "vllm", "torchserve", "onnx", "mlflow", "kubeflow", "vertex ai", "sagemaker", "model deployment", "model registry", "inference optimization", "model pipeline"],
+      "suggestion": "Detail production model serving, inference acceleration, and automated MLOps pipelines using Triton, ONNX, or vLLM."
+    },
+    {
+      "id": "aiml-distributed-training",
+      "type": "term",
+      "label": "Distributed Training & Multi-GPU Acceleration",
+      "weight": 12,
+      "terms": ["distributed training", "multi-gpu", "deepspeed", "fsdp", "data parallel", "model parallel", "ray train", "horovod", "megatron", "accelerate", "gpu cluster"],
+      "suggestion": "Showcase scalable distributed model training across multi-GPU or cluster environments."
+    },
+    {
+      "id": "aiml-math-stats",
+      "type": "term",
+      "label": "Mathematical & Statistical Foundations",
+      "weight": 12,
+      "terms": ["linear algebra", "multivariable calculus", "probability", "statistics", "gradient descent", "loss function", "mathematical optimization", "convex optimization", "backpropagation", "cross-entropy", "matrix decomposition"],
+      "suggestion": "Emphasize foundational mathematical formulation of loss functions, statistical inference, and optimization."
+    },
+    {
+      "id": "aiml-data-scale",
+      "type": "term",
+      "label": "Data Science & Feature Engineering Pipeline",
       "weight": 10,
-      "terms": ["javascript", "typescript", "es6", "node.js"],
-      "suggestion": "Include evidence of JavaScript/TypeScript development and key libraries used."
+      "terms": ["numpy", "pandas", "data preprocessing", "feature engineering", "data pipeline", "spark", "matplotlib", "seaborn", "vector database", "pinecone", "milvus", "chroma"],
+      "suggestion": "Detail data cleaning, feature extraction, and manipulation with NumPy, Pandas, or distributed data frameworks."
     },
     {
-      "id": "tech-react",
+      "id": "aiml-lang-perf",
       "type": "term",
-      "label": "React Ecosystem",
+      "label": "High-Performance Systems & Languages (C++ / CUDA / Python)",
       "weight": 10,
-      "terms": ["react", "react.js", "next.js", "redux"],
-      "suggestion": "Highlight frontend React projects, state management, or component architectures."
+      "terms": ["c++", "cuda", "triton kernel", "gpu kernel", "parallel computing", "cython", "high performance computing"],
+      "suggestion": "Demonstrate proficiency in C++ or CUDA for systems engineering and high-throughput computational models."
     },
     {
-      "id": "tech-backend",
+      "id": "aiml-eval-metrics",
       "type": "term",
-      "label": "Backend API Development",
+      "label": "Model Evaluation, Validation & Benchmarking",
       "weight": 10,
-      "terms": ["express", "fastapi", "rest api", "graphql", "microservices"],
-      "suggestion": "Demonstrate backend RESTful or GraphQL API design and implementation."
+      "terms": ["model evaluation", "cross-validation", "precision", "recall", "f1-score", "roc-auc", "perplexity", "latency profiling", "throughput", "a/b testing", "dice score", "iou", "bce loss"],
+      "suggestion": "Detail quantitative evaluation metrics, error analysis, benchmarking, and validation methodologies."
     },
     {
-      "id": "tech-database",
+      "id": "devops-cicd",
       "type": "term",
-      "label": "Database Design & SQL",
+      "label": "CI/CD Pipeline Automation",
+      "weight": 14,
+      "terms": ["ci/cd", "continuous integration", "continuous deployment", "jenkins", "github actions", "gitlab ci", "argocd", "circleci", "buildkite", "pipeline automation"],
+      "suggestion": "Demonstrate automated CI/CD pipeline creation, build triggers, and deployment workflows."
+    },
+    {
+      "id": "devops-iac",
+      "type": "term",
+      "label": "Infrastructure as Code (IaC)",
+      "weight": 14,
+      "terms": ["terraform", "ansible", "cloudformation", "pulumi", "terragrunt", "infrastructure as code", "iac", "chef", "puppet"],
+      "suggestion": "Show hands-on experience provisioning and managing infrastructure declaratively using Terraform or Ansible."
+    },
+    {
+      "id": "devops-k8s",
+      "type": "term",
+      "label": "Kubernetes & Container Orchestration",
+      "weight": 14,
+      "terms": ["kubernetes", "k8s", "helm", "eks", "gke", "aks", "container orchestration", "service mesh", "istio", "ingress"],
+      "suggestion": "Highlight container cluster management, Helm charts, ingress, and production deployment on Kubernetes."
+    },
+    {
+      "id": "devops-cloud",
+      "type": "term",
+      "label": "Cloud Infrastructure & Networking",
+      "weight": 14,
+      "terms": ["aws", "azure", "gcp", "google cloud", "amazon web services", "vpc", "iam", "subnet", "security group", "route53", "load balancer", "cloud architecture"],
+      "suggestion": "Provide concrete examples architecting secure cloud networking, IAM policies, and cloud infrastructure."
+    },
+    {
+      "id": "devops-observability",
+      "type": "term",
+      "label": "Observability, Telemetry & SRE",
+      "weight": 12,
+      "terms": ["prometheus", "grafana", "datadog", "elk", "splunk", "cloudwatch", "sre", "observability", "incident response", "alerting", "opentelemetry", "sli", "slo"],
+      "suggestion": "Showcase metrics collection, alert management, and system observability using tools like Prometheus/Grafana."
+    },
+    {
+      "id": "devops-linux-sysadmin",
+      "type": "term",
+      "label": "Linux Systems & Scripting",
       "weight": 10,
-      "terms": ["sql", "mysql", "postgresql", "mongodb", "database"],
-      "suggestion": "Mention specific databases, schema design, or query optimization experience."
+      "terms": ["bash", "shell script", "linux administration", "systemd", "tcp/ip", "dns", "ssl/tls", "linux kernel", "iptables"],
+      "suggestion": "Demonstrate Linux systems administration, networking fundamentals, and shell automation."
     },
     {
-      "id": "tech-cloud",
+      "id": "devops-secops",
       "type": "term",
-      "label": "Cloud & Containerization",
+      "label": "DevSecOps & Infrastructure Hardening",
+      "weight": 10,
+      "terms": ["devsecops", "trivy", "sonarqube", "hashicorp vault", "vault", "secrets management", "vulnerability scanning", "iam least privilege", "compliance", "container security"],
+      "suggestion": "Detail automated vulnerability scanning, secrets rotation, and cloud security hardening."
+    },
+    {
+      "id": "backend-core",
+      "type": "term",
+      "label": "Backend Architecture & REST APIs",
+      "weight": 14,
+      "terms": ["express", "node.js", "fastapi", "spring boot", "django", "golang", "go", "rest api", "restful", "microservices", "backend architecture"],
+      "suggestion": "Demonstrate scalable server architecture and production REST API design."
+    },
+    {
+      "id": "backend-db-sql",
+      "type": "term",
+      "label": "Relational Database Modeling & SQL Optimization",
+      "weight": 12,
+      "terms": ["postgresql", "mysql", "sql", "database indexing", "query optimization", "acid", "relational database", "transactions", "stored procedures", "schema design"],
+      "suggestion": "Detail relational database modeling, indexing strategies, transactions, and performance query tuning."
+    },
+    {
+      "id": "backend-db-nosql-cache",
+      "type": "term",
+      "label": "In-Memory Caching & NoSQL Datastores",
+      "weight": 12,
+      "terms": ["redis", "memcached", "mongodb", "dynamodb", "cassandra", "caching", "nosql", "key-value store"],
+      "suggestion": "Detail distributed caching with Redis/Memcached and NoSQL document/column stores."
+    },
+    {
+      "id": "backend-distributed-systems",
+      "type": "term",
+      "label": "Distributed Systems, Message Queues & Event-Driven Architecture",
+      "weight": 12,
+      "terms": ["kafka", "rabbitmq", "message queue", "event-driven", "pub/sub", "concurrency", "distributed systems", "load balancing", "asynchronous", "sqs"],
+      "suggestion": "Showcase asynchronous messaging pipelines, event-driven microservices, and queue consumers."
+    },
+    {
+      "id": "backend-security",
+      "type": "term",
+      "label": "Authentication, API Security & Access Control",
+      "weight": 10,
+      "terms": ["jwt", "oauth", "bcrypt", "authentication", "authorization", "rbac", "https", "cors", "owasp", "rate limiting"],
+      "suggestion": "Highlight secure authentication mechanisms, JWT handling, access control, and API defense."
+    },
+    {
+      "id": "backend-api-design",
+      "type": "term",
+      "label": "API Contracts, Schema & RPC Protocols",
+      "weight": 10,
+      "terms": ["restful api", "graphql", "grpc", "protobuf", "openapi", "swagger", "api contract"],
+      "suggestion": "Demonstrate formal API specifications, gRPC/Protobuf protocols, or GraphQL schemas."
+    },
+    {
+      "id": "backend-testing",
+      "type": "term",
+      "label": "Backend Testing & Test-Driven Development",
       "weight": 8,
-      "terms": ["docker", "kubernetes", "aws", "gcp", "azure", "ci/cd"],
-      "suggestion": "Add concrete examples of containerization, cloud deployment, or CI/CD pipelines."
+      "terms": ["unit testing", "integration testing", "jest", "mocha", "pytest", "supertest", "test-driven", "tdd", "mocking"],
+      "suggestion": "Demonstrate automated unit, integration, and API test coverage with Jest or PyTest."
+    },
+    {
+      "id": "frontend-react",
+      "type": "term",
+      "label": "Modern Frontend & React Ecosystem",
+      "weight": 14,
+      "terms": ["react", "react.js", "next.js", "vue", "angular", "component architecture"],
+      "suggestion": "Demonstrate frontend component architecture, responsive design, and state management."
+    },
+    {
+      "id": "frontend-typescript",
+      "type": "term",
+      "label": "TypeScript & Static Type Systems",
+      "weight": 12,
+      "terms": ["typescript", "ts", "type safety", "interfaces", "generics", "type inference"],
+      "suggestion": "Highlight production development using strongly-typed TypeScript interfaces and generics."
+    },
+    {
+      "id": "frontend-state",
+      "type": "term",
+      "label": "Global State Management & Server State",
+      "weight": 12,
+      "terms": ["redux", "redux toolkit", "zustand", "react query", "tanstack query", "context api", "state management"],
+      "suggestion": "Detail state management and asynchronous data fetching patterns with Redux Toolkit or React Query."
+    },
+    {
+      "id": "frontend-ui-styling",
+      "type": "term",
+      "label": "Responsive UI, Tailwind CSS & Component Styling",
+      "weight": 10,
+      "terms": ["tailwind css", "tailwind", "css3", "sass", "scss", "responsive design", "ui components", "design system", "radix", "shadcn"],
+      "suggestion": "Showcase clean responsive layout implementation using Tailwind CSS or modern CSS paradigms."
+    },
+    {
+      "id": "frontend-perf",
+      "type": "term",
+      "label": "Web Performance, SSR & Core Web Vitals",
+      "weight": 10,
+      "terms": ["web performance", "core web vitals", "code splitting", "lazy loading", "ssr", "server-side rendering", "lighthouse", "bundle optimization"],
+      "suggestion": "Highlight web performance profiling, SSR with Next.js, and Core Web Vitals optimization."
+    },
+    {
+      "id": "frontend-testing",
+      "type": "term",
+      "label": "Frontend Component & End-to-End Testing",
+      "weight": 8,
+      "terms": ["jest", "react testing library", "cypress", "playwright", "end-to-end testing", "e2e"],
+      "suggestion": "Include automated component and end-to-end UI testing practices."
+    },
+    {
+      "id": "eng-git",
+      "type": "term",
+      "label": "Version Control & Collaborative Engineering",
+      "weight": 6,
+      "terms": ["git", "github", "gitlab", "code review", "agile", "scrum", "pull request"],
+      "suggestion": "Demonstrate clean Git workflow, branching, and pull request collaboration."
     }
   ]
 }

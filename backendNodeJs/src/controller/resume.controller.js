@@ -17,13 +17,14 @@ import {
   findResumeVersionById,
   approveResumeVersion,
   deductUserCredit,
+  getLatestTailoredVersion,
 } from "../model/resume.model.js";
 import { findUserById } from "../model/user.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
-import { tailorResumeWithEvidence } from "../services/tailoring.service.js";
-import { generateAtsHtml, generateAtsPlainText } from "../services/export.service.js";
+import { tailorResumeWithEvidence, parseOriginalResumeSections } from "../services/tailoring.service.js";
+import { generateAtsHtml, generateAtsPlainText, generateAtsPdf } from "../services/export.service.js";
 
 const CHART_COLORS = [
   "#2563eb",
@@ -63,7 +64,7 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
     req.file.mimetype,
   );
 
-  const requirements = scoringEngine.extractRequirements(jobDescription);
+  const requirements = scoringEngine.extractRequirements(jobDescription, targetRole, targetCompany);
 
   if (!requirements || requirements.length === 0) {
     throw new ApiError(
@@ -72,7 +73,7 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
     );
   }
 
-  const scoringResult = scoringEngine.calculateScore(resumeText, requirements);
+  const scoringResult = scoringEngine.calculateScore(resumeText, requirements, targetRole, targetCompany);
 
   const resumeTitle = title || `${targetRole} Resume`;
   const resumeResult = await createResume(
@@ -92,10 +93,13 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
       id: r.id,
       label: r.label,
       type: r.type,
+      weight: r.weight,
       priority: r.priority,
       suggestion: r.suggestion,
       source: r.source,
       minimum: r.minimum,
+      terms: r.terms || [],
+      pattern: r.pattern || "",
     })),
     initialScore: scoringResult.score,
   });
@@ -207,14 +211,85 @@ export const getApplicationScoreHistory = asyncHandler(async (req, res) => {
   }));
   const initialScore = history[0]?.score || 0;
   const latestScore = history[history.length - 1]?.score || 0;
+
+  // Hydrate mandatory gaps, breakdown, original content, and latest tailored version
+  let mandatoryGaps = [];
+  let breakdown = [];
+  let originalContent = null;
+  let latestTailoredVersion = null;
+  let jobDescription = "";
+
+  try {
+    const app = await findJobApplicationById(applicationId, userId);
+    if (app) {
+      jobDescription = app.job_description || "";
+      const parsedContent = typeof app.parsed_content === "string"
+        ? JSON.parse(app.parsed_content)
+        : app.parsed_content || {};
+      const rawResumeText = parsedContent.rawText || "";
+
+      // Universally parse the original resume sections
+      const baseResume = parseOriginalResumeSections(rawResumeText, req.user?.name);
+      originalContent = {
+        name: baseResume.name,
+        contact: baseResume.contact,
+        summary: baseResume.summary,
+        skills: baseResume.skills,
+        projects: baseResume.projects,
+        education: baseResume.education,
+        achievements: baseResume.achievements,
+      };
+
+      // Always extract fresh, active requirements based on the job description and domain
+      const activeRequirements = scoringEngine.extractRequirements(
+        app.job_description,
+        app.target_role,
+        app.target_company
+      );
+
+      if (rawResumeText && activeRequirements.length) {
+        const evalResult = scoringEngine.calculateScore(
+          rawResumeText,
+          activeRequirements,
+          app.target_role,
+          app.target_company
+        );
+        mandatoryGaps = evalResult.mandatoryGaps;
+        breakdown = evalResult.breakdown;
+      }
+
+      // Check if a tailored version exists (version > 1)
+      const latestVer = await getLatestTailoredVersion(applicationId, userId);
+      if (latestVer && latestVer.version_number > 1) {
+        const tc = typeof latestVer.tailored_content === "string"
+          ? JSON.parse(latestVer.tailored_content)
+          : latestVer.tailored_content;
+        latestTailoredVersion = {
+          id: latestVer.id,
+          versionNumber: latestVer.version_number,
+          score: latestVer.score_snapshot,
+          tailoredContent: tc,
+          isApproved: Boolean(latestVer.is_approved),
+        };
+      }
+    }
+  } catch (e) {
+    console.error("Failed to hydrate gaps in history:", e.message);
+  }
+
   return res.status(200).json(
     new ApiResponse(200, "Application score history fetched successfully", {
       applicationId: appInfo.application_id,
       targetRole: appInfo.target_role,
-      targetCompany: appInfo.target_company || "General",
+      targetCompany: appInfo.target_company || "",
+      jobDescription,
       initialScore,
       currentScore: latestScore,
       scoreGain: latestScore - initialScore,
+      mandatoryGaps,
+      breakdown,
+      originalContent,
+      latestTailoredVersion,
       history,
     }),
   );
@@ -265,17 +340,23 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
   }
 
   const evidenceItems = await getEvidenceItems(applicationId);
-  const rawResumeText = app.parsed_content?.rawText || "";
+  const parsedContent = typeof app.parsed_content === "string"
+    ? JSON.parse(app.parsed_content)
+    : app.parsed_content || {};
+  const rawResumeText = parsedContent.rawText || "";
   const requirements = typeof app.extracted_requirements === "string"
     ? JSON.parse(app.extracted_requirements)
     : app.extracted_requirements || [];
 
-  const { tailoredContent, scoringResult } = await tailorResumeWithEvidence({
+  const user = await findUserById(userId);
+  const { originalContent, tailoredContent, scoringResult } = await tailorResumeWithEvidence({
     rawResumeText,
     jobDescription: app.job_description,
     requirements,
     evidenceItems,
     targetRole: app.target_role,
+    targetCompany: app.target_company,
+    userName: user?.name,
   });
 
   const nextVersion = await getNextVersionNumber(applicationId);
@@ -289,7 +370,10 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
     isApproved: false,
   });
 
-  await updateJobApplicationTailored(applicationId, scoringResult.score, tailoredContent);
+  await updateJobApplicationTailored(applicationId, scoringResult.score, {
+    ...tailoredContent,
+    originalContent,
+  });
 
   return res.status(200).json(
     new ApiResponse(200, "Tailored resume generated successfully.", {
@@ -297,6 +381,7 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
       versionNumber: nextVersion,
       score: scoringResult.score,
       band: scoringResult.band,
+      originalContent,
       tailoredContent,
       breakdown: scoringResult.breakdown,
       mandatoryGaps: scoringResult.mandatoryGaps,
@@ -370,15 +455,26 @@ export const exportResumeVersion = asyncHandler(async (req, res) => {
     : version.tailored_content || {};
 
   const payload = {
-    candidateName: user?.name || "Candidate",
+    candidateName: tailoredContent.name || user?.name || "Candidate",
     targetRole: version.target_role,
+    contact: tailoredContent.contact || {},
     summary: tailoredContent.summary,
-    skills: tailoredContent.skills || [],
+    skills: tailoredContent.skills || {},
+    projects: tailoredContent.projects || [],
+    education: tailoredContent.education || [],
+    achievements: tailoredContent.achievements || [],
     bulletImprovements: tailoredContent.bulletImprovements || [],
     rawResumeText: tailoredContent.fullTailoredText || "",
   };
 
   const filename = `${version.target_role.replace(/[^a-zA-Z0-9]/g, "_")}_Resume`;
+
+  if (format === "pdf") {
+    const pdfBuffer = await generateAtsPdf(payload);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}.pdf"`);
+    res.setHeader("Content-Type", "application/pdf");
+    return res.send(pdfBuffer);
+  }
 
   if (format === "txt") {
     const textOutput = generateAtsPlainText(payload);

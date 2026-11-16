@@ -18,7 +18,7 @@ export default function Protected({ children, authentication = true }) {
 
   return loader ? (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
-      <div className="w-10 h-10 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
+      <div className="w-10 h-10 border-3 border-[#0F4C3A]/20 border-t-[#0F4C3A] rounded-full animate-spin" />
       <p className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 animate-pulse">
         Verifying Session...
       </p>

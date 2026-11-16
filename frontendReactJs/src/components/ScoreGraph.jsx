@@ -1,15 +1,22 @@
 import React, { useState } from "react";
 import { TrendingUp, Award, Layers } from "lucide-react";
 
-export default function ScoreGraph({ series = [] }) {
+export default function ScoreGraph({
+  series = [],
+  interactive = true,
+  compact = false,
+  title = "ATS Alignment Trajectory",
+  subtitle = "Score evolution across versions for all target job descriptions",
+  badgeText = "Target: 75%+",
+}) {
   const [activeSeries, setActiveSeries] = useState({});
   const [hoveredPoint, setHoveredPoint] = useState(null);
 
   if (!series || series.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 p-8 text-center bg-slate-50/50 dark:bg-slate-900/30">
-        <TrendingUp className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-600 mb-3" />
-        <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">
+      <div className={`rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-center bg-slate-50/50 dark:bg-slate-900/30 ${compact ? "p-6" : "p-8"}`}>
+        <TrendingUp className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-600 mb-2" />
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
           No Score Progression Yet
         </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
@@ -20,15 +27,16 @@ export default function ScoreGraph({ series = [] }) {
   }
 
   const toggleLine = (id) => {
+    if (!interactive) return;
     setActiveSeries((prev) => ({
       ...prev,
       [id]: prev[id] === undefined ? false : !prev[id],
     }));
   };
 
-  const visibleSeries = series.filter(
-    (s) => activeSeries[s.applicationId] !== false
-  );
+  const visibleSeries = interactive
+    ? series.filter((s) => activeSeries[s.applicationId] !== false)
+    : series;
 
   let maxVersion = 1;
   series.forEach((s) => {
@@ -39,11 +47,11 @@ export default function ScoreGraph({ series = [] }) {
   maxVersion = Math.max(maxVersion, 3);
 
   const width = 640;
-  const height = 240;
-  const padLeft = 40;
-  const padRight = 30;
-  const padTop = 20;
-  const padBottom = 30;
+  const height = compact ? 190 : 240;
+  const padLeft = 38;
+  const padRight = 24;
+  const padTop = compact ? 16 : 20;
+  const padBottom = compact ? 26 : 30;
 
   const getX = (version) => {
     const range = width - padLeft - padRight;
@@ -56,30 +64,56 @@ export default function ScoreGraph({ series = [] }) {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm transition-colors">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+    <div
+      className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs transition-colors ${
+        compact ? "p-4 sm:p-5" : "p-5 sm:p-6"
+      }`}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              ATS Alignment Trajectory
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+              {title}
             </h3>
-            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-              Target: 75%+
-            </span>
+            {badgeText && (
+              <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-[#0F4C3A] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                {badgeText}
+              </span>
+            )}
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Score evolution across versions for all target job descriptions
-          </p>
+          {subtitle && (
+            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              {subtitle}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
           {series.map((s) => {
-            const isVisible = activeSeries[s.applicationId] !== false;
+            const isVisible = interactive ? activeSeries[s.applicationId] !== false : true;
+
+            if (!interactive) {
+              return (
+                <div
+                  key={s.applicationId}
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 select-none"
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: s.color || "#0F4C3A" }}
+                  />
+                  <span className="truncate max-w-[130px]">
+                    {s.targetRole} {s.targetCompany ? `@ ${s.targetCompany}` : ""}
+                  </span>
+                </div>
+              );
+            }
+
             return (
               <button
                 key={s.applicationId}
                 onClick={() => toggleLine(s.applicationId)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
                   isVisible
                     ? "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700 shadow-xs"
                     : "opacity-40 border-transparent bg-transparent text-slate-400"
@@ -87,7 +121,7 @@ export default function ScoreGraph({ series = [] }) {
               >
                 <span
                   className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: s.color }}
+                  style={{ backgroundColor: s.color || "#0F4C3A" }}
                 />
                 <span className="truncate max-w-[120px]">
                   {s.targetRole} {s.targetCompany ? `@ ${s.targetCompany}` : ""}
@@ -101,17 +135,19 @@ export default function ScoreGraph({ series = [] }) {
       <div className="relative overflow-x-auto">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto min-w-[500px] select-none"
+          className={`w-full h-auto min-w-[480px] select-none ${
+            !interactive ? "pointer-events-none" : ""
+          }`}
         >
           <line
             x1={padLeft}
             y1={getY(75)}
             x2={width - padRight}
             y2={getY(75)}
-            stroke="#10b981"
+            stroke="#0F4C3A"
             strokeDasharray="4 4"
-            strokeWidth="1"
-            opacity="0.4"
+            strokeWidth="1.2"
+            opacity="0.35"
           />
 
           {[0, 25, 50, 75, 100].map((tick) => (
@@ -126,10 +162,10 @@ export default function ScoreGraph({ series = [] }) {
                 strokeWidth="1"
               />
               <text
-                x={padLeft - 8}
+                x={padLeft - 6}
                 y={getY(tick) + 3}
                 textAnchor="end"
-                className="fill-slate-400 dark:fill-slate-500 text-[10px] font-mono"
+                className="fill-slate-400 dark:fill-slate-500 text-[9px] font-mono"
               >
                 {tick}%
               </text>
@@ -149,7 +185,7 @@ export default function ScoreGraph({ series = [] }) {
               />
               <text
                 x={getX(v)}
-                y={height - padBottom + 16}
+                y={height - padBottom + 14}
                 textAnchor="middle"
                 className="fill-slate-400 dark:fill-slate-500 text-[10px] font-medium"
               >
@@ -165,12 +201,14 @@ export default function ScoreGraph({ series = [] }) {
               .map((pt, i) => `${i === 0 ? "M" : "L"} ${getX(pt.version)} ${getY(pt.score)}`)
               .join(" ");
 
+            const lineColor = s.color || "#0F4C3A";
+
             return (
               <g key={s.applicationId}>
                 <path
                   d={pathData}
                   fill="none"
-                  stroke={s.color}
+                  stroke={lineColor}
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -181,6 +219,7 @@ export default function ScoreGraph({ series = [] }) {
                   const cx = getX(pt.version);
                   const cy = getY(pt.score);
                   const isHovered =
+                    interactive &&
                     hoveredPoint?.applicationId === s.applicationId &&
                     hoveredPoint?.version === pt.version;
 
@@ -189,23 +228,28 @@ export default function ScoreGraph({ series = [] }) {
                       <circle
                         cx={cx}
                         cy={cy}
-                        r={isHovered ? 7 : 4.5}
-                        fill={pt.isApproved ? "#10b981" : s.color}
+                        r={isHovered ? 7 : (compact ? 4 : 4.5)}
+                        fill={pt.isApproved ? "#0F4C3A" : lineColor}
                         stroke="white"
-                        className="dark:stroke-slate-900 cursor-pointer transition-all"
+                        className={`dark:stroke-slate-900 transition-all ${
+                          interactive ? "cursor-pointer" : ""
+                        }`}
                         strokeWidth="2"
-                        onMouseEnter={() =>
-                          setHoveredPoint({
-                            ...pt,
-                            applicationId: s.applicationId,
-                            targetRole: s.targetRole,
-                            targetCompany: s.targetCompany,
-                            color: s.color,
-                            x: cx,
-                            y: cy,
-                          })
+                        onMouseEnter={
+                          interactive
+                            ? () =>
+                                setHoveredPoint({
+                                  ...pt,
+                                  applicationId: s.applicationId,
+                                  targetRole: s.targetRole,
+                                  targetCompany: s.targetCompany,
+                                  color: lineColor,
+                                  x: cx,
+                                  y: cy,
+                                })
+                            : undefined
                         }
-                        onMouseLeave={() => setHoveredPoint(null)}
+                        onMouseLeave={interactive ? () => setHoveredPoint(null) : undefined}
                       />
                     </g>
                   );
@@ -215,7 +259,7 @@ export default function ScoreGraph({ series = [] }) {
           })}
         </svg>
 
-        {hoveredPoint && (
+        {interactive && hoveredPoint && (
           <div
             className="absolute z-20 pointer-events-none rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-3 py-2 text-xs shadow-xl border border-slate-700 dark:border-slate-200"
             style={{

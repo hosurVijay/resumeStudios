@@ -51,7 +51,7 @@ function highlightText(text, terms = [], active = true) {
       return (
         <mark
           key={i}
-          className="bg-blue-100 dark:bg-blue-900/60 text-blue-900 dark:text-blue-200 font-semibold px-1 py-0.5 rounded border border-blue-300 dark:border-blue-700/80 transition-colors"
+          className="bg-emerald-100 dark:bg-emerald-950/70 text-emerald-900 dark:text-emerald-200 font-semibold px-1 py-0.5 rounded border border-emerald-300 dark:border-emerald-700/80 transition-colors"
           title="Analyzed ATS Key Term"
         >
           {part}
@@ -95,7 +95,7 @@ function ResumeCard({
     <div
       className={`rounded-2xl border flex flex-col h-full bg-white dark:bg-slate-900 transition-all ${
         isTailored
-          ? "border-blue-300 dark:border-blue-800 shadow-md shadow-blue-500/5 ring-1 ring-blue-500/20"
+          ? "border-emerald-300 dark:border-emerald-800 shadow-md shadow-emerald-500/5 ring-1 ring-[#0F4C3A]/20"
           : "border-slate-200 dark:border-slate-800 shadow-xs"
       }`}
     >
@@ -103,7 +103,7 @@ function ResumeCard({
       <div
         className={`p-4 border-b flex flex-wrap items-center justify-between gap-2 ${
           isTailored
-            ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/60"
+            ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/60"
             : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800"
         }`}
       >
@@ -139,7 +139,7 @@ function ResumeCard({
           <h2 className="text-xl font-bold uppercase tracking-wide text-slate-900 dark:text-white">
             {displayName}
           </h2>
-          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+          <p className="text-xs font-semibold text-[#0F4C3A] dark:text-emerald-400 mt-0.5">
             {targetRole}
           </p>
 
@@ -158,7 +158,7 @@ function ResumeCard({
             )}
             {contact.linkedin && (
               <span className="flex items-center gap-1">
-                <Globe className="w-3 h-3 text-blue-500" />
+                <Globe className="w-3 h-3 text-[#0F4C3A] dark:text-emerald-400" />
                 {contact.linkedin.replace(/^https?:\/\//, "")}
               </span>
             )}
@@ -177,7 +177,6 @@ function ResumeCard({
           </div>
         </div>
 
-        {/* Professional Summary */}
         {summary && (
           <div>
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
@@ -185,7 +184,7 @@ function ResumeCard({
                 Professional Summary
               </h3>
               {isTailored && (
-                <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900">
+                <span className="text-[10px] font-semibold text-[#0F4C3A] dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-900">
                   Role-Aligned
                 </span>
               )}
@@ -218,7 +217,7 @@ function ResumeCard({
                     key={idx}
                     className={`text-[11px] px-2 py-0.5 rounded-md ${
                       isTailored && isMatched && showHighlights
-                        ? "bg-blue-100 dark:bg-blue-900/60 text-blue-900 dark:text-blue-200 border border-blue-300 dark:border-blue-700 font-semibold"
+                        ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-semibold"
                         : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
                     }`}
                   >
@@ -247,7 +246,7 @@ function ResumeCard({
                             key={itemIdx}
                             className={`px-1.5 py-0.5 rounded-md ${
                               isTailored && isMatched && showHighlights
-                                ? "bg-blue-100 dark:bg-blue-900/60 text-blue-900 dark:text-blue-200 border border-blue-300 dark:border-blue-700 font-semibold"
+                                ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-semibold"
                                 : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
                             }`}
                           >
@@ -279,33 +278,39 @@ function ResumeCard({
               )}
             </div>
             <div className="space-y-3.5">
-              {projects.map((proj, pIdx) => (
+              {projects.filter(Boolean).map((proj, pIdx) => (
                 <div key={pIdx} className="space-y-1">
                   <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      {proj.name}
-                      {proj.role && (
+                      {proj?.name || "Project"}
+                      {proj?.role && (
                         <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 ml-1">
                           — {proj.role}
                         </span>
                       )}
                     </span>
                   </div>
-                  {proj.techStack && (
+                  {proj?.techStack && (
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
                       Tech Stack: {isTailored ? highlightText(proj.techStack, highlightTerms, showHighlights) : proj.techStack}
                     </p>
                   )}
                   <ul className="space-y-1 pl-2">
-                    {(proj.bullets || []).map((b, bIdx) => (
-                      <li
-                        key={bIdx}
-                        className="text-[11px] leading-relaxed text-slate-800 dark:text-slate-200 flex items-start gap-1.5"
-                      >
-                        <span className="text-blue-500 font-bold shrink-0">•</span>
-                        <span>{isTailored ? highlightText(b, highlightTerms, showHighlights) : b}</span>
-                      </li>
-                    ))}
+                    {(proj?.bullets || [])
+                      .filter(Boolean)
+                      .map((b, bIdx) => {
+                        const bulletText = typeof b === "string" ? b : (b?.improvedBullet || String(b || ""));
+                        if (!bulletText) return null;
+                        return (
+                          <li
+                            key={bIdx}
+                            className="text-[11px] leading-relaxed text-slate-800 dark:text-slate-200 flex items-start gap-1.5"
+                          >
+                            <span className="text-[#0F4C3A] dark:text-emerald-400 font-bold shrink-0">•</span>
+                            <span>{isTailored ? highlightText(bulletText, highlightTerms, showHighlights) : bulletText}</span>
+                          </li>
+                        );
+                      })}
                   </ul>
                 </div>
               ))}
@@ -415,7 +420,7 @@ export default function ResumePreview({
       <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/70 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400">
               Interactive Resume Comparison
             </span>
             {isApproved && (
@@ -424,7 +429,7 @@ export default function ResumePreview({
                 Approved Version
               </span>
             )}
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100/70 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-[#0F4C3A] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
               <Sparkles className="w-3 h-3" />
               {totalAnalyzedTerms} ATS Terms Highlighted
             </span>
@@ -443,7 +448,7 @@ export default function ResumePreview({
               onClick={() => setViewMode("split")}
               className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                 viewMode === "split"
-                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-xs"
+                  ? "bg-white dark:bg-slate-700 text-[#0F4C3A] dark:text-emerald-300 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
               }`}
               title="View Original and Tailored Resumes Side-by-Side"
@@ -457,7 +462,7 @@ export default function ResumePreview({
               onClick={() => setViewMode("tailored")}
               className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                 viewMode === "tailored"
-                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-xs"
+                  ? "bg-white dark:bg-slate-700 text-[#0F4C3A] dark:text-emerald-300 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
               }`}
               title="View Only Tailored Version"
@@ -471,7 +476,7 @@ export default function ResumePreview({
               onClick={() => setViewMode("original")}
               className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                 viewMode === "original"
-                  ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-xs"
+                  ? "bg-white dark:bg-slate-700 text-[#0F4C3A] dark:text-emerald-300 shadow-xs"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
               }`}
               title="View Only Original Resume"
@@ -487,12 +492,12 @@ export default function ResumePreview({
             onClick={() => setShowHighlights(!showHighlights)}
             className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
               showHighlights
-                ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 shadow-xs"
+                ? "bg-emerald-50 dark:bg-emerald-950/40 text-[#0F4C3A] dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 shadow-xs"
                 : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700"
             }`}
             title="Toggle ATS Key Terms Highlighting"
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <Sparkles className="w-3.5 h-3.5 text-[#0F4C3A] dark:text-emerald-400" />
             <span className="hidden sm:inline">{showHighlights ? "Highlights ON" : "Highlights OFF"}</span>
           </button>
 
@@ -604,7 +609,7 @@ export default function ResumePreview({
                   type="checkbox"
                   checked={confirmed}
                   onChange={(e) => setConfirmed(e.target.checked)}
-                  className="w-4 h-4 rounded-sm text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  className="w-4 h-4 rounded-sm text-[#0F4C3A] focus:ring-[#0F4C3A]/20 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                 />
                 <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   I reviewed both versions and confirm the tailored highlights are truthful.
@@ -616,7 +621,7 @@ export default function ResumePreview({
               <button
                 onClick={onApprove}
                 disabled={!confirmed || isApproving}
-                className="flex items-center justify-center gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+                className="flex items-center justify-center gap-1.5 text-xs font-bold bg-[#0F4C3A] hover:bg-[#0A382A] disabled:opacity-50 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
               >
                 <CheckCircle className="w-4 h-4" />
                 <span>{isApproving ? "Approving..." : "Approve & Download (1 Credit)"}</span>
@@ -634,7 +639,7 @@ export default function ResumePreview({
               <button
                 onClick={() => onDownload("pdf")}
                 disabled={downloadingFormat === "pdf"}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/20 transition-all cursor-pointer"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white shadow-sm transition-all cursor-pointer"
                 title="Download the 2nd (Tailored) ATS PDF"
               >
                 {downloadingFormat === "pdf" ? (
@@ -648,7 +653,7 @@ export default function ResumePreview({
               <button
                 onClick={() => onDownload("html")}
                 disabled={downloadingFormat === "html"}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors cursor-pointer"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-semibold px-3.5 py-2.5 rounded-xl bg-[#0F4C3A] hover:bg-[#0A382A] text-white shadow-xs transition-colors cursor-pointer"
                 title="Download ATS HTML"
               >
                 {downloadingFormat === "html" ? (

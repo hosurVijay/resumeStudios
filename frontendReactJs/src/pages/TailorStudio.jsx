@@ -23,6 +23,7 @@ import { updateCredits } from "../store/authSlice.js";
 import ScoreRing from "../components/ScoreRing.jsx";
 import EvidenceModal from "../components/EvidenceModal.jsx";
 import ResumePreview from "../components/ResumePreview.jsx";
+import { toast } from "../components/Toast.jsx";
 
 export default function TailorStudio() {
   const [searchParams] = useSearchParams();
@@ -96,6 +97,12 @@ export default function TailorStudio() {
           setError(err.response?.data?.message || "Failed to load application details.");
         })
         .finally(() => setLoading(false));
+    } else {
+      const pendingJd = sessionStorage.getItem("pending_jd");
+      if (pendingJd) {
+        setJobDescription(pendingJd);
+        sessionStorage.removeItem("pending_jd");
+      }
     }
   }, [existingAppId]);
 
@@ -158,9 +165,10 @@ export default function TailorStudio() {
     try {
       await api.post(`/resumes/applications/${analysisResult.applicationId}/evidence`, { items });
       setShowEvidenceModal(false);
+      toast.success("Verified evidence saved successfully!");
       handleGenerateTailored();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to save evidence.");
+      toast.error(err.response?.data?.message || "Failed to save evidence.");
     } finally {
       setSavingEvidence(false);
     }
@@ -168,16 +176,45 @@ export default function TailorStudio() {
 
   const handleGenerateTailored = async () => {
     if (!analysisResult?.applicationId) return;
+
+    const isSubscribed = userData?.subscriptionStatus === "active";
+    const availableCredits = userData?.freeCredits ?? 0;
+
+    if (!isSubscribed && availableCredits <= 0) {
+      toast.error("You have 0 tailoring credits remaining. Please upgrade or purchase credits to tailor your resume.");
+      navigate("/pricing");
+      return;
+    }
+
     setError("");
     setTailoringLoading(true);
-    setStep(3);
     setShowPreview(false); // keep preview hidden by default
 
     try {
       const response = await api.post(`/resumes/applications/${analysisResult.applicationId}/tailor`);
-      setTailoredData(response.data.data);
+      const data = response.data?.data;
+      setTailoredData(data);
+      setStep(3);
+
+      // Immediately deduct and sync credits in Redux so navbar reflects change instantly
+      if (typeof data?.remainingCredits === "number") {
+        dispatch(updateCredits(data.remainingCredits));
+      } else if (!isSubscribed && availableCredits > 0) {
+        dispatch(updateCredits(availableCredits - 1));
+      }
+
+      toast.success(
+        isSubscribed
+          ? "Tailored resume generated under active subscription!"
+          : "Tailored resume generated! 1 Credit deducted."
+      );
     } catch (err) {
+      setStep(2);
       setError(err.response?.data?.message || "Tailoring failed.");
+      toast.error(err.response?.data?.message || "Tailoring failed.");
+      if (err.response?.status === 403) {
+        navigate("/pricing");
+      }
     } finally {
       setTailoringLoading(false);
     }
@@ -194,11 +231,9 @@ export default function TailorStudio() {
 
       setIsApproved(true);
       setIsTruthConfirmed(true);
-      if (userData?.subscriptionStatus !== "active" && userData?.freeCredits > 0) {
-        dispatch(updateCredits(userData.freeCredits - 1));
-      }
+      toast.success("Resume approved successfully!");
     } catch (err) {
-      alert(err.response?.data?.message || "Approval failed.");
+      toast.error(err.response?.data?.message || "Approval failed.");
     } finally {
       setApproving(false);
     }
@@ -319,7 +354,7 @@ export default function TailorStudio() {
       <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-blue-600" />
+            <Sparkles className="w-5 h-5 text-[#0F4C3A] dark:text-emerald-400" />
             Resume Tailoring Studio
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -351,14 +386,14 @@ export default function TailorStudio() {
               1. Upload Candidate Resume
             </h2>
 
-            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-blue-500 transition-colors relative">
+            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 text-center hover:border-[#0F4C3A] transition-colors relative">
               <input
                 type="file"
                 accept=".pdf,.docx"
                 onChange={handleFileChange}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              <UploadCloud className="w-10 h-10 mx-auto text-blue-600 dark:text-blue-400 mb-2" />
+              <UploadCloud className="w-10 h-10 mx-auto text-[#0F4C3A] dark:text-emerald-400 mb-2" />
               {file ? (
                 <div>
                   <p className="text-sm font-bold text-slate-900 dark:text-white">{file.name}</p>
@@ -367,7 +402,7 @@ export default function TailorStudio() {
               ) : (
                 <div>
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                    Drop your resume here, or <span className="text-blue-600 dark:text-blue-400 underline">browse files</span>
+                    Drop your resume here, or <span className="text-[#0F4C3A] dark:text-emerald-400 underline">browse files</span>
                   </p>
                   <p className="text-xs text-slate-400 mt-1">Supports PDF and DOCX (Parsed in-memory only)</p>
                 </div>
@@ -387,7 +422,7 @@ export default function TailorStudio() {
                     value={targetRole}
                     onChange={(e) => setTargetRole(e.target.value)}
                     placeholder="e.g. Senior Backend Engineer"
-                    className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0F4C3A]/20 focus:border-[#0F4C3A]"
                   />
                 </div>
               </div>
@@ -403,7 +438,7 @@ export default function TailorStudio() {
                     value={targetCompany}
                     onChange={(e) => setTargetCompany(e.target.value)}
                     placeholder="e.g. Stripe / Google"
-                    className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0F4C3A]/20 focus:border-[#0F4C3A]"
                   />
                 </div>
               </div>
@@ -419,14 +454,14 @@ export default function TailorStudio() {
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
                 placeholder="Paste the full job description here. Our LLD engine will extract mandatory vs. preferred requirements..."
-                className="w-full text-xs p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                className="w-full text-xs p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0F4C3A]/20 focus:border-[#0F4C3A]"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-xl shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 text-xs font-semibold bg-[#0F4C3A] hover:bg-[#0A382A] disabled:opacity-50 text-white py-3 rounded-xl shadow-sm transition-all cursor-pointer"
             >
               <span>{loading ? "Analyzing Alignment & Extracting Gaps..." : "Analyze Alignment & Find Gaps"}</span>
               <ArrowRight className="w-4 h-4" />
@@ -439,7 +474,7 @@ export default function TailorStudio() {
         <div className="space-y-6">
           <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="space-y-2 text-center md:text-left">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400">
                 Initial Alignment Assessment
               </span>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -497,7 +532,7 @@ export default function TailorStudio() {
                         </div>
                         <p className="text-[11px] opacity-90 leading-relaxed">{gap.reason}</p>
                         {gap.suggestion && (
-                          <p className="text-[11px] text-blue-700 dark:text-blue-300 italic pt-0.5">
+                          <p className="text-[11px] text-emerald-800 dark:text-emerald-300 italic pt-0.5">
                             💡 Tip: {gap.suggestion}
                           </p>
                         )}
@@ -524,15 +559,25 @@ export default function TailorStudio() {
                   <ArrowRight className="w-4 h-4" />
                 </button>
               ) : (
-                <div />
+                <button
+                  type="button"
+                  onClick={handleGenerateTailored}
+                  disabled={tailoringLoading}
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4 text-emerald-500" />
+                  <span>{tailoringLoading ? "Generating..." : "Tailor Direct (1 Credit)"}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               )}
 
               <button
                 onClick={handleOpenEvidenceModal}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+                disabled={tailoringLoading}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 text-xs font-semibold bg-[#0F4C3A] hover:bg-[#0A382A] text-white px-5 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Verify Real Evidence (Q&A Interview)</span>
+                <span>Verify Evidence & Tailor (1 Credit)</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -544,7 +589,7 @@ export default function TailorStudio() {
         <div className="space-y-6">
           {tailoringLoading ? (
             <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3">
-              <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+              <Loader2 className="w-10 h-10 animate-spin text-[#0F4C3A]" />
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
                 Synthesizing Verified Evidence...
               </h3>
@@ -558,8 +603,8 @@ export default function TailorStudio() {
               <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-7 shadow-xs space-y-5">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 pb-5 border-b border-slate-200 dark:border-slate-800">
                   <div className="space-y-1.5">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-semibold">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-[#0F4C3A] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold">
+                      <Sparkles className="w-3.5 h-3.5 text-[#0F4C3A] dark:text-emerald-400" />
                       <span>Step 3 of 3: Tailoring Complete</span>
                     </div>
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
@@ -593,7 +638,7 @@ export default function TailorStudio() {
                 {/* Preview Trigger Bar */}
                 <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#0F4C3A]/10 text-[#0F4C3A] dark:text-emerald-400 flex items-center justify-center shrink-0">
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>
@@ -610,7 +655,7 @@ export default function TailorStudio() {
 
                   <button
                     onClick={() => setShowPreview(!showPreview)}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl bg-[#0F4C3A] hover:bg-[#0A382A] text-white shadow-sm transition-all cursor-pointer"
                   >
                     {showPreview ? (
                       <>
@@ -635,7 +680,7 @@ export default function TailorStudio() {
                           type="checkbox"
                           checked={isTruthConfirmed}
                           onChange={(e) => setIsTruthConfirmed(e.target.checked)}
-                          className="w-4 h-4 rounded-sm text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                          className="w-4 h-4 rounded-sm text-[#0F4C3A] focus:ring-[#0F4C3A]/20 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                         />
                         <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                           I confirm that all bullet points and claims are factually truthful.
@@ -645,7 +690,7 @@ export default function TailorStudio() {
                       <button
                         onClick={handleApprove}
                         disabled={!isTruthConfirmed || approving}
-                        className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl shadow-md shadow-emerald-600/30 transition-all cursor-pointer shrink-0"
+                        className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-xs font-bold bg-[#0F4C3A] hover:bg-[#0A382A] disabled:opacity-50 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer shrink-0"
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span>{approving ? "Approving..." : "Approve & Freeze Version (1 Credit)"}</span>
@@ -662,7 +707,7 @@ export default function TailorStudio() {
                         <button
                           onClick={() => handleDownload("pdf")}
                           disabled={downloadingFormat === "pdf"}
-                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-sm transition-all cursor-pointer"
+                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white shadow-sm transition-all cursor-pointer"
                           title="Download ATS-compliant PDF resume"
                         >
                           {downloadingFormat === "pdf" ? (
@@ -676,7 +721,7 @@ export default function TailorStudio() {
                         <button
                           onClick={() => handleDownload("html")}
                           disabled={downloadingFormat === "html"}
-                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all cursor-pointer"
+                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl bg-[#0F4C3A] hover:bg-[#0A382A] text-white shadow-sm transition-all cursor-pointer"
                           title="Download ATS HTML resume"
                         >
                           {downloadingFormat === "html" ? (
@@ -735,6 +780,12 @@ export default function TailorStudio() {
             ) || []
           }
           initialAnswers={evidenceItems}
+          existingProjects={
+            analysisResult?.originalContent?.projects ||
+            tailoredData?.tailoredContent?.projects ||
+            tailoredData?.originalContent?.projects ||
+            []
+          }
           onSave={handleSaveEvidence}
           onClose={() => setShowEvidenceModal(false)}
           isSubmitting={savingEvidence}

@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  ShieldCheck,
   Sun,
   Moon,
   Sparkles,
@@ -10,17 +9,48 @@ import {
   User,
   PlusCircle,
   LayoutDashboard,
+  Home,
+  Tag,
+  UserCog,
+  ShieldCheck,
 } from "lucide-react";
 import { toggleTheme } from "../store/themeSlice.js";
 import { logout } from "../store/authSlice.js";
 import { api } from "../api/client.js";
+import BrandLogo from "./BrandLogo.jsx";
 
 export default function Navbar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { userData, status } = useSelector((state) => state.auth);
   const { mode } = useSelector((state) => state.theme);
+
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // Close dropdown menu when clicking anywhere outside or pressing Escape
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
 
   const handleLogout = async () => {
     try {
@@ -32,104 +62,153 @@ export default function Navbar() {
   };
 
   const isDark = mode === "dark";
+  const isPro = userData?.subscriptionStatus === "active";
+  const subscriptionName = isPro ? "Pro Plan" : "Starter Free Plan";
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md transition-colors">
+    <nav className="sticky top-0 z-40 border-b border-slate-200/90 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <Link to={status && userData ? "/dashboard" : "/"} className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-none">
-              Resume<span className="text-blue-600 dark:text-blue-400">Studio</span>
-            </span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-              Truth-Preserving AI
-            </span>
-          </div>
-        </Link>
+        <BrandLogo to="/" showSubtitle={true} size="md" />
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => dispatch(toggleTheme())}
-            aria-label="Toggle theme"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
-          </button>
-
+        <div className="flex items-center gap-2 sm:gap-3">
           {status && userData ? (
             <>
+              {/* 1. Home */}
               <Link
-                to="/dashboard"
-                className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                to="/"
+                className="text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-[#0F4C3A] dark:hover:text-emerald-400 px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5"
               >
-                <LayoutDashboard className="w-4 h-4" />
-                Dashboard
+                <Home className="w-3.5 h-3.5" />
+                <span>Home</span>
               </Link>
 
+              {/* 2. Tailor Resume */}
               <Link
                 to="/studio"
-                className="hidden sm:flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg shadow-sm shadow-blue-600/30 transition-all hover:shadow-md"
+                className="text-xs font-semibold bg-[#0F4C3A] hover:bg-[#0A382A] text-white px-3 sm:px-3.5 py-1.5 rounded-lg shadow-sm transition-all flex items-center gap-1.5"
               >
-                <PlusCircle className="w-4 h-4" />
-                Tailor Resume
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Tailor Resume</span>
               </Link>
 
-              <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                <Sparkles className="w-3 h-3 text-blue-500" />
-                {userData.subscriptionStatus === "active" ? (
-                  <span>Pro Member</span>
-                ) : (
-                  <span>{userData.freeCredits ?? 3} Credits</span>
-                )}
+              {/* 3. Pricing */}
+              <Link
+                to="/pricing"
+                className="text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-[#0F4C3A] dark:hover:text-emerald-400 px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+              >
+                <Tag className="w-3.5 h-3.5" />
+                <span>Pricing</span>
+              </Link>
+
+              {/* 4. Credits */}
+              <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-[#0F4C3A] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                <Sparkles className="w-3 h-3 text-[#0F4C3A] dark:text-emerald-400" />
+                <span>{userData.freeCredits ?? 3} Credits</span>
               </div>
 
-              <div className="relative">
+              {/* 5. User Avatar Icon & Dropdown */}
+              <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setMenuOpen(!menuOpen)}
-                  className="w-9 h-9 rounded-full bg-gradient-to-tr from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center font-bold text-sm text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:ring-2 hover:ring-blue-500 transition-all"
+                  aria-label="User menu"
+                  className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:ring-2 hover:ring-[#0F4C3A]/30 overflow-hidden transition-all cursor-pointer"
                 >
-                  {userData.name ? userData.name.charAt(0).toUpperCase() : <User className="w-4 h-4" />}
+                  {userData.profileImage ? (
+                    <img
+                      src={userData.profileImage}
+                      alt={userData.name || "User"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : userData.name ? (
+                    userData.name.charAt(0).toUpperCase()
+                  ) : (
+                    <User className="w-4 h-4" />
+                  )}
                 </button>
 
                 {menuOpen && (
-                  <div className="absolute right-0 mt-2 w-52 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95">
-                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                        {userData.name}
-                      </p>
+                  <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 animate-in fade-in zoom-in-95">
+                    {/* User Identity Header */}
+                    <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                          {userData.name}
+                        </p>
+                      </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                         {userData.email}
                       </p>
+
+                      {/* Active Subscription Badge */}
+                      <div className="pt-1.5 pb-0.5">
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#0F4C3A] dark:text-emerald-400" />
+                            <div className="text-left">
+                              <span className="text-[10px] text-slate-400 font-medium block leading-none">
+                                Plan
+                              </span>
+                              <span className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                                {subscriptionName}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                            {userData.freeCredits ?? 3} Cr
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    <Link
-                      to="/dashboard"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex sm:hidden items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <LayoutDashboard className="w-4 h-4" />
-                      Dashboard
-                    </Link>
+                    {/* Navigation inside Icon Dropdown */}
+                    <div className="py-1">
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#0F4C3A] dark:hover:text-emerald-400 transition-colors"
+                      >
+                        <LayoutDashboard className="w-4 h-4 text-slate-400" />
+                        <span>Dashboard</span>
+                      </Link>
 
-                    <Link
-                      to="/studio"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex sm:hidden items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <PlusCircle className="w-4 h-4" />
-                      Tailor Resume
-                    </Link>
+                      <Link
+                        to="/profile"
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#0F4C3A] dark:hover:text-emerald-400 transition-colors"
+                      >
+                        <UserCog className="w-4 h-4 text-slate-400" />
+                        <span>Edit Profile</span>
+                      </Link>
 
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sign Out
-                    </button>
+                      {/* Theme Toggle Button inside Dropdown */}
+                      <button
+                        onClick={() => dispatch(toggleTheme())}
+                        className="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {isDark ? (
+                            <Sun className="w-4 h-4 text-amber-400" />
+                          ) : (
+                            <Moon className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                          )}
+                          <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">
+                          {isDark ? "Dark" : "Light"}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Sign Out */}
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-1">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -137,14 +216,20 @@ export default function Navbar() {
           ) : (
             <div className="flex items-center gap-2">
               <Link
+                to="/pricing"
+                className="text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-[#0F4C3A] dark:hover:text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Pricing
+              </Link>
+              <Link
                 to="/login"
-                className="text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-[#0F4C3A] dark:hover:text-emerald-400 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 Sign In
               </Link>
               <Link
                 to="/register"
-                className="text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg shadow-sm shadow-blue-600/30 transition-all hover:shadow-md"
+                className="text-xs font-semibold bg-[#0F4C3A] hover:bg-[#0A382A] text-white px-3.5 py-2 rounded-lg shadow-sm transition-all"
               >
                 Get Started
               </Link>

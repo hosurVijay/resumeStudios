@@ -11,7 +11,20 @@ const authSlice = createSlice({
   reducers: {
     login: (state, action) => {
       state.status = true;
-      state.userData = action.payload?.userData || action.payload;
+      const user = action.payload?.user || action.payload?.userData || action.payload;
+      if (user && typeof user === "object") {
+        state.userData = {
+          ...user,
+          freeCredits:
+            typeof user.freeCredits === "number"
+              ? user.freeCredits
+              : typeof user.free_credits === "number"
+              ? user.free_credits
+              : 3,
+        };
+      } else {
+        state.userData = user;
+      }
     },
     logout: (state) => {
       state.status = false;

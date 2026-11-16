@@ -19,10 +19,12 @@ export const parseOriginalResumeSections = (rawResumeText = "", defaultName = ""
     if (/@|http|www|\.com|\.in|\.edu|\d{5,}/.test(line)) continue;
     if (/^(resume|curriculum|vitae|cv|profile|summary|contact|about\s+me)/i.test(line)) continue;
     const clean = line
-      .replace(/(?:full[- ]?stack|software|engineer|developer|architect|designer|lead|manager|node\.js|python|react).*$/i, "")
+      .replace(/(?:full[- ]?stack|software|engineer|developer|architect|designer|lead|manager|node\.js|python|react|solution|delivery).*$/i, "")
+      .replace(/,\s*(?:pmp|csm|phd|mba|ms|bs|be|btech|mtech|ca|cpa|prince2|itil).*$/i, "")
+      .replace(/[|•·, -]+$/, "")
       .trim();
     if (clean.length >= 3 && clean.length <= 50 && !/^[0-9+() -]+$/.test(clean)) {
-      name = clean;
+      name = clean.replace(/[|•·, -]+$/, "").trim();
       break;
     }
   }
@@ -32,7 +34,7 @@ export const parseOriginalResumeSections = (rawResumeText = "", defaultName = ""
 
   // 2. Dynamic Contact Extraction
   const emailMatch = normalizedText.match(/[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}/);
-  const phoneMatch = normalizedText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\b\d{10}\b/);
+  const phoneMatch = normalizedText.match(/(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\d{5}[-.\s]?\d{5}|\b\d{10}\b)/);
   const linkedinMatch = normalizedText.match(/(?:(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[\w.-]+)/i);
   const githubMatch = normalizedText.match(/(?:(?:https?:\/\/)?(?:www\.)?github\.com\/[\w.-]+)/i);
 
@@ -58,12 +60,12 @@ export const parseOriginalResumeSections = (rawResumeText = "", defaultName = ""
 
   // 3. Dynamic Section Boundary Parsing
   const SECTION_PATTERNS = [
-    { key: "summary", regex: /^(?:about\s+me|professional\s+summary|executive\s+summary|summary|profile|objective)\b/i },
-    { key: "education", regex: /^(?:education|academic\s+background|academics|qualifications|academic\s+profile)\b/i },
-    { key: "skills", regex: /^(?:technical\s+skills|skills\s*&?\s*competencies|skills|technologies|core\s+competencies|technical\s+proficiencies)\b/i },
-    { key: "projects", regex: /^(?:projects|experience|work\s+experience|professional\s+experience|employment\s+history|key\s+projects)\b/i },
-    { key: "achievements", regex: /^(?:achievements|awards|honors|accolades|certifications|awards\s*&\s*achievements)\b/i },
-    { key: "softSkills", regex: /^(?:soft\s+skills|core\s+strengths|interpersonal\s+skills)\b/i },
+    { key: "summary", regex: /^(?:about\s+me|professional\s+summary|executive\s+summary|summary|profile|career\s+objective|objective)\s*:?$/i },
+    { key: "education", regex: /^(?:education(?:\s*&\s*certifications)?|academic\s+background|academics|qualifications|academic\s+profile)\s*:?$/i },
+    { key: "skills", regex: /^(?:technical\s+(?:skills|toolkit)|skills(?:\s*&?\s*competencies)?|technologies|core\s+competencies|core\s+expertise|areas\s+of\s+expertise|technical\s+proficiencies)\s*:?$/i },
+    { key: "projects", regex: /^(?:projects|experience|work\s+experience|professional\s+experience|employment\s+history|key\s+projects)\s*:?$/i },
+    { key: "achievements", regex: /^(?:achievements|awards|honors|accolades|certifications|awards\s*&\s*achievements|leadership\s+impact|recognition)\s*:?$/i },
+    { key: "softSkills", regex: /^(?:soft\s+skills|core\s+strengths|interpersonal\s+skills)\s*:?$/i },
   ];
 
   const sections = {};
@@ -71,8 +73,10 @@ export const parseOriginalResumeSections = (rawResumeText = "", defaultName = ""
   let buffer = [];
 
   for (const line of lines) {
+    const isSentence = /[.,;]$/.test(line);
     const matched =
       line.length <= 45 &&
+      !isSentence &&
       !/^[•\-*]|\d+\.\s+/.test(line) &&
       SECTION_PATTERNS.find((p) => p.regex.test(line));
     if (matched) {
@@ -143,7 +147,7 @@ export const parseOriginalResumeSections = (rawResumeText = "", defaultName = ""
 
   // 5. Dynamic Projects & Experience Extraction
   const projects = [];
-  const ACTION_VERBS = /\b(?:led|built|developed|designed|handled|trained|implemented|created|engineered|benchmarked|architected|deployed|optimized|configured|automated|integrated|spearheaded|evaluated|analyzed|modeled|orchestrated)\b/i;
+  const ACTION_VERBS = /\b(?:led|built|developed|designed|handled|trained|implemented|created|engineered|benchmarked|architected|deployed|optimized|configured|automated|integrated|spearheaded|evaluated|analyzed|modeled|orchestrated|directed|managed|governed|championed|pioneered|scaled|owned|mentored|coordinated|delivered|raised|applied|partnered|founded|established)\b/i;
 
   if (sections.projects) {
     const projLines = sections.projects.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -151,6 +155,15 @@ export const parseOriginalResumeSections = (rawResumeText = "", defaultName = ""
 
     for (let i = 0; i < projLines.length; i++) {
       const pl = projLines[i];
+      // Skip repeated page headers (e.g. Candidate Name at the top of subsequent pages) or page numbers/links
+      if (
+        /^-\s*\d+\s+of\s+\d+\s*-/i.test(pl) ||
+        /^(?:page\s+\d+|http|www)/i.test(pl) ||
+        (name && pl.split("|")[0].trim().toLowerCase() === name.toLowerCase())
+      ) {
+        continue;
+      }
+
       const isTechStack = /^tech(?:nology|\s+stack)?\s*:/i.test(pl);
       const isExplicitBullet = /^[•\-*]|\d+\.\s+/.test(pl);
       const startsWithActionVerb = ACTION_VERBS.test(pl.split(/\s+/).slice(0, 3).join(" "));
@@ -165,30 +178,46 @@ export const parseOriginalResumeSections = (rawResumeText = "", defaultName = ""
       // Check if line is a role/subtitle line right below project name
       if (
         curProject &&
+        Array.isArray(curProject.bullets) &&
         curProject.bullets.length === 0 &&
-        !curProject.role &&
-        (/^(?:team\s+lead|lead|frontend|backend|full\s*stack|developer|engineer|intern|contributor)\b/i.test(pl) ||
-          (pl.includes("|") && pl.length < 75))
+        (!curProject.role ||
+          /platforms?|division|portfolio|practice|domain|years\)/i.test(pl) ||
+          /^(?:retail|banking|enterprise|cloud|data|mobile)\s+platforms/i.test(pl)) &&
+        (/^(?:team\s+lead|lead|frontend|backend|full\s*stack|developer|engineer|intern|contributor|solution\s+delivery\s+manager|project\s+manager|program\s+manager|delivery\s+leader|director|head|vp)\b/i.test(pl) ||
+          (pl.includes("|") && pl.length < 85) ||
+          /platforms?|years\)/i.test(pl))
       ) {
-        curProject.role = pl;
+        curProject.role = curProject.role ? `${curProject.role} • ${pl}` : pl;
         continue;
       }
 
       // Check if line is a bullet point
       if (isExplicitBullet || (curProject && startsWithActionVerb)) {
+        if (!curProject) {
+          curProject = {
+            name: "Professional Experience",
+            role: "",
+            techStack: "",
+            bullets: [],
+          };
+        }
+        if (!Array.isArray(curProject.bullets)) {
+          curProject.bullets = [];
+        }
         const cleanedBullet = pl.replace(/^[•\-*]\s*|\d+\.\s*/, "").trim();
         curProject.bullets.push(cleanedBullet);
         continue;
       }
 
       // Check if line is a continuation of the previous bullet
-      if (curProject && curProject.bullets.length > 0) {
+      if (curProject && Array.isArray(curProject.bullets) && curProject.bullets.length > 0) {
         const lastBulletIdx = curProject.bullets.length - 1;
         const isDistinctTitle =
-          pl.length < 80 &&
+          pl.length < 85 &&
           !/[.,;]$/.test(pl) &&
-          (/platform|screening|detection|system|pipeline|application|app|service|tracker|dashboard/i.test(pl) ||
-            (i + 1 < projLines.length && /^tech(?:nology|\s+stack)?\s*:/i.test(projLines[i + 1])));
+          (pl.includes("|") ||
+            (i + 1 < projLines.length &&
+              (/^[•\-*]|\d+\.\s+/.test(projLines[i + 1]) || ACTION_VERBS.test(projLines[i + 1]))));
 
         if (!isDistinctTitle) {
           curProject.bullets[lastBulletIdx] += " " + pl;
@@ -206,6 +235,15 @@ export const parseOriginalResumeSections = (rawResumeText = "", defaultName = ""
       };
     }
     if (curProject) projects.push(curProject);
+
+    // Filter out empty or repeated header projects
+    const cleanProjects = projects.filter((p) => {
+      if (!p || !p.name) return false;
+      if (name && p.name.toLowerCase() === name.toLowerCase() && (!Array.isArray(p.bullets) || p.bullets.length === 0)) return false;
+      return true;
+    });
+    projects.length = 0;
+    projects.push(...cleanProjects);
   }
 
   // 6. Dynamic Skills Extraction
@@ -292,6 +330,124 @@ ${rawResumeText.slice(0, 4500)}
 `;
 };
 
+export const generateProfessionalBullet = ({
+  tech,
+  task = "",
+  outcome = "",
+  index = 0,
+  targetRole = "",
+  projectName = "",
+}) => {
+  const cleanTech = (tech || "").trim();
+  const cleanTask = (task || "").trim();
+  const rawOutcome = (outcome || "").trim();
+
+  // Polish outcome if provided
+  let outcomePhrase = "";
+  if (rawOutcome) {
+    const stripped = rawOutcome
+      .replace(/^(achieving|resulting in|cutting|reducing|increasing|scaling to|by)\s*/i, "")
+      .trim();
+    if (/^\d+%|\b\d+x\b|\b\d+\s*(?:ms|seconds|users|req|requests|k|million)\b/i.test(stripped)) {
+      outcomePhrase = `, improving performance by ${stripped}`;
+    } else {
+      outcomePhrase = `, achieving ${stripped}`;
+    }
+  }
+
+  // If candidate provided a task, polish and elevate it
+  if (cleanTask && cleanTask.length >= 4) {
+    let polishedTask = cleanTask.replace(/\.+$/, "");
+
+    const weakVerbMap = [
+      [/^(?:built|created|made)\s+/i, "Engineered "],
+      [/^(?:worked on|helped with|contributed to|assisted in)\s+/i, "Collaborated on the implementation of "],
+      [/^(?:used|using|utilized|applied)\s+/i, "Leveraged "],
+      [/^(?:setup|set up|configured)\s+/i, "Configured and provisioned "],
+      [/^(?:improved|optimized|sped up|made faster)\s+/i, "Refactored and optimized "],
+      [/^(?:tested|automated tests? for)\s+/i, "Implemented automated testing suites for "],
+      [/^(?:deployed|shipped|released)\s+/i, "Orchestrated the continuous deployment of "],
+      [/^(?:designed|architected)\s+/i, "Architected "],
+      [/^(?:maintained|fixed|debugged)\s+/i, "Resolved critical bottlenecks and maintained "],
+    ];
+
+    for (const [regex, replacement] of weakVerbMap) {
+      if (regex.test(polishedTask)) {
+        polishedTask = polishedTask.replace(regex, replacement);
+        break;
+      }
+    }
+
+    polishedTask = polishedTask.charAt(0).toUpperCase() + polishedTask.slice(1);
+
+    if (cleanTech && !new RegExp(`\\b${cleanTech.replace(/[^a-zA-Z0-9]/g, "\\$&")}\\b`, "i").test(polishedTask)) {
+      if (/utilizing|leveraging|using|with/i.test(polishedTask)) {
+        return `${polishedTask}${outcomePhrase}.`;
+      }
+      return `${polishedTask} utilizing ${cleanTech}${outcomePhrase}.`;
+    }
+
+    return `${polishedTask}${outcomePhrase}.`;
+  }
+
+  // If candidate didn't provide a task, synthesize an executive bullet based on tech domain
+  const t = cleanTech.toLowerCase();
+  const i = Math.abs(index);
+
+  // 1. DevOps / Cloud / Containers / CI/CD
+  if (/docker|kubernetes|k8s|aws|gcp|azure|terraform|helm|ci\/cd|pipeline|ansible|linux|prometheus|grafana|cloud/i.test(t)) {
+    const patterns = [
+      `Orchestrated containerized microservices and automated deployment workflows utilizing ${cleanTech}${outcomePhrase || ", reinforcing system availability and zero-downtime rollouts"}.`,
+      `Architected resilient cloud infrastructure and deployment pipelines leveraging ${cleanTech}${outcomePhrase || ", enforcing high availability and automated failover capabilities"}.`,
+      `Automated continuous integration and infrastructure provisioning with ${cleanTech}${outcomePhrase || ", accelerating release velocity and deployment consistency"}.`,
+      `Streamlined observability and system reliability utilizing ${cleanTech}${outcomePhrase || ", ensuring predictable performance across distributed environments"}.`,
+    ];
+    return patterns[i % patterns.length];
+  }
+
+  // 2. AI / ML / Deep Learning / Data Science
+  if (/pytorch|tensorflow|keras|jax|scikit|nlp|vision|llm|langchain|rag|model|embedding|deep\s*learning|hugging\s*face|transformers|pandas|numpy/i.test(t)) {
+    const patterns = [
+      `Trained, benchmarked, and deployed high-performance machine learning models utilizing ${cleanTech}${outcomePhrase || ", advancing intelligent automated inference across workloads"}.`,
+      `Engineered neural architecture and predictive analytics pipelines leveraging ${cleanTech}${outcomePhrase || ", optimizing evaluation accuracy and inference latency"}.`,
+      `Fine-tuned and integrated state-of-the-art model architectures with ${cleanTech} into production workflows${outcomePhrase || ", elevating classification and prediction accuracy"}.`,
+      `Designed end-to-end data transformation and feature evaluation pipelines utilizing ${cleanTech}${outcomePhrase || ", bolstering model convergence and benchmark scores"}.`,
+    ];
+    return patterns[i % patterns.length];
+  }
+
+  // 3. Frontend / Web / UI
+  if (/react|next|vue|angular|typescript|tailwind|css|html|frontend|redux|ui|ux|client/i.test(t)) {
+    const patterns = [
+      `Developed modern, responsive component architectures utilizing ${cleanTech}${outcomePhrase || ", delivering intuitive, accessible client-facing user interfaces"}.`,
+      `Engineered high-performance web applications leveraging ${cleanTech}${outcomePhrase || ", optimizing Core Web Vitals and interactive render performance"}.`,
+      `Crafted modular UI design systems and state-management workflows with ${cleanTech}${outcomePhrase || ", enhancing component reusability and maintainability across pages"}.`,
+      `Refactored and modernized client interfaces utilizing ${cleanTech}${outcomePhrase || ", ensuring seamless cross-browser responsiveness and performance"}.`,
+    ];
+    return patterns[i % patterns.length];
+  }
+
+  // 4. Testing / Security / Auth
+  if (/jest|cypress|selenium|pytest|testing|test|security|oauth|jwt|auth|zero\s*trust|encryption|iam/i.test(t)) {
+    const patterns = [
+      `Implemented comprehensive end-to-end automated testing suites with ${cleanTech}${outcomePhrase || ", elevating test coverage and preventing production regressions"}.`,
+      `Hardened enterprise application security utilizing ${cleanTech}${outcomePhrase || ", enforcing zero-trust role-based access controls and robust session verification"}.`,
+      `Established automated quality verification gates leveraging ${cleanTech}${outcomePhrase || ", streamlining release confidence across engineering sprints"}.`,
+      `Secured distributed service communications utilizing ${cleanTech}${outcomePhrase || ", safeguarding sensitive transactional data and credential lifecycles"}.`,
+    ];
+    return patterns[i % patterns.length];
+  }
+
+  // 5. Backend / APIs / Databases (Default for Backend / Full-stack)
+  const backendPatterns = [
+    `Engineered high-throughput, low-latency API services using ${cleanTech}${outcomePhrase || ", streamlining asynchronous request processing and database query efficiency"}.`,
+    `Designed and implemented scalable backend architectures leveraging ${cleanTech}${outcomePhrase || ", ensuring high concurrency and strict transactional integrity"}.`,
+    `Optimized distributed data pipelines and caching layers utilizing ${cleanTech}${outcomePhrase || ", eliminating data bottlenecks and enhancing query response times"}.`,
+    `Developed robust, resilient microservice endpoints in ${cleanTech}${outcomePhrase || ", maintaining clean separation of concerns and production stability"}.`,
+  ];
+  return backendPatterns[i % backendPatterns.length];
+};
+
 export const tailorResumeWithEvidence = async ({
   rawResumeText,
   jobDescription,
@@ -372,16 +528,35 @@ export const tailorResumeWithEvidence = async ({
       ? JSON.parse(JSON.stringify(structuredTailored.skills))
       : JSON.parse(JSON.stringify(baseResume.skills));
 
-  let finalProjects =
-    structuredTailored?.projects && structuredTailored.projects.length > 0
-      ? JSON.parse(JSON.stringify(structuredTailored.projects))
-      : JSON.parse(JSON.stringify(baseResume.projects));
+  let rawProjects =
+    structuredTailored?.projects && Array.isArray(structuredTailored.projects) && structuredTailored.projects.length > 0
+      ? structuredTailored.projects
+      : baseResume.projects || [];
+
+  // Guarantee every project is a valid object and bullets is a clean array of non-null strings
+  let finalProjects = rawProjects
+    .filter(Boolean)
+    .map((p) => {
+      if (typeof p === "string") {
+        return { name: p, role: "", techStack: "", bullets: [] };
+      }
+      return {
+        name: p?.name || "Project",
+        role: p?.role || "",
+        techStack: p?.techStack || "",
+        bullets: Array.isArray(p?.bullets)
+          ? p.bullets.filter((b) => b !== null && b !== undefined).map(String)
+          : p?.bullet
+          ? [String(p.bullet)]
+          : [],
+      };
+    });
 
   // 5. INJECT VERIFIED EVIDENCE: Update Technical Skills & Projects
   if (verifiedEvidence.length > 0) {
     const skillCategories = Object.keys(finalSkills);
 
-    verifiedEvidence.forEach((e) => {
+    verifiedEvidence.forEach((e, evidenceIdx) => {
       const req = e.requirement_text || e.requirementText || "";
       const ctx =
         typeof e.context_data === "string"
@@ -499,38 +674,40 @@ export const tailorResumeWithEvidence = async ({
         }
       }
 
-      // 5c. Formulate High-Impact Action Bullet
+      // 5c. Formulate High-Impact Professional Action Bullet
       const task = (ctx.whatDone || ctx.task || "").trim();
       const outcome = (ctx.measurableOutcomes || ctx.outcome || "").trim();
       const where = (ctx.where || "").trim();
+      const primaryTech = uniqueTerms.length > 0 ? uniqueTerms[0] : req;
 
-      let bullet = "";
-      if (task) {
-        const capitalizedTask = task.charAt(0).toUpperCase() + task.slice(1);
-        if (outcome) {
-          const cleanOutcome = outcome.replace(/^(achieving|resulting in|cutting|reducing|increasing|scaling to)\s*/i, "");
-          bullet = `${capitalizedTask}, achieving ${cleanOutcome}.`;
-        } else {
-          bullet = `${capitalizedTask}.`;
-        }
-      } else {
-        const cleanReq = uniqueTerms.length > 0 ? uniqueTerms.join("/") : req;
-        bullet = `Leveraged ${cleanReq} in system architecture and evaluation${outcome ? `, achieving ${outcome}` : ""}.`;
-      }
+      const bullet = generateProfessionalBullet({
+        tech: primaryTech,
+        task,
+        outcome,
+        index: evidenceIdx,
+        targetRole,
+        projectName: where,
+      });
 
-      // 5d. Match to Project
+      // 5d. Match to Project / Company Section
       let matchedProj = null;
       if (where && finalProjects.length > 0) {
-        const whereLower = where.toLowerCase();
+        const whereLower = where.trim().toLowerCase();
         matchedProj = finalProjects.find((p) => {
-          const pNameLower = (p.name || "").toLowerCase();
-          return pNameLower.includes(whereLower) || whereLower.includes(pNameLower);
+          const pNameLower = (p.name || "").trim().toLowerCase();
+          const pRoleLower = (p.role || "").trim().toLowerCase();
+          return (
+            pNameLower === whereLower ||
+            pNameLower.includes(whereLower) ||
+            whereLower.includes(pNameLower) ||
+            (whereLower.length >= 3 && pRoleLower.includes(whereLower))
+          );
         });
       }
 
       if (matchedProj) {
-        if (!matchedProj.bullets) matchedProj.bullets = [];
-        matchedProj.bullets.push(bullet);
+        if (!Array.isArray(matchedProj.bullets)) matchedProj.bullets = [];
+        if (bullet) matchedProj.bullets.push(bullet);
         if (uniqueTerms.length > 0) {
           const existingTech = matchedProj.techStack || "";
           const newTechs = uniqueTerms.filter((t) => !existingTech.toLowerCase().includes(t.toLowerCase()));
@@ -538,22 +715,32 @@ export const tailorResumeWithEvidence = async ({
             matchedProj.techStack = existingTech ? `${existingTech}, ${newTechs.join(", ")}` : newTechs.join(", ");
           }
         }
-      } else if (where && where.length >= 3 && !/^(project|previous|college|various|self)$/i.test(where)) {
+      } else if (where && where.length >= 2 && !/^(project|previous|college|various|self)$/i.test(where)) {
         finalProjects.push({
           name: where,
           role: "Core Contributor",
           techStack: uniqueTerms.join(", "),
-          bullets: [bullet],
+          bullets: bullet ? [bullet] : [],
         });
       } else if (finalProjects.length > 0) {
-        if (!finalProjects[0].bullets) finalProjects[0].bullets = [];
-        finalProjects[0].bullets.push(bullet);
+        if (!finalProjects[0] || typeof finalProjects[0] !== "object") {
+          finalProjects[0] = { name: "Key Project", role: "Contributor", techStack: "", bullets: [] };
+        }
+        if (!Array.isArray(finalProjects[0].bullets)) finalProjects[0].bullets = [];
+        if (bullet) finalProjects[0].bullets.push(bullet);
+        if (uniqueTerms.length > 0) {
+          const existingTech = finalProjects[0].techStack || "";
+          const newTechs = uniqueTerms.filter((t) => !existingTech.toLowerCase().includes(t.toLowerCase()));
+          if (newTechs.length) {
+            finalProjects[0].techStack = existingTech ? `${existingTech}, ${newTechs.join(", ")}` : newTechs.join(", ");
+          }
+        }
       } else {
         finalProjects.push({
           name: `${targetRole || "Engineering"} Project`,
           role: "Lead Developer",
           techStack: uniqueTerms.join(", "),
-          bullets: [bullet],
+          bullets: bullet ? [bullet] : [],
         });
       }
     });
@@ -569,7 +756,7 @@ export const tailorResumeWithEvidence = async ({
         if (s && s.length >= 2 && verifiedSkillsList.length < 8) verifiedSkillsList.push(s);
       });
     });
-    const projNames = finalProjects.slice(0, 2).map((p) => p.name).filter(Boolean);
+    const projNames = finalProjects.filter(Boolean).slice(0, 2).map((p) => p?.name).filter(Boolean);
     const projStr = projNames.length > 0 ? ` with practical implementation across ${projNames.join(" and ")}` : "";
     finalSummary = `Dedicated ${safeRole} with demonstrated hands-on competencies in ${verifiedSkillsList.slice(0, 5).join(", ")}${projStr}. Experienced in end-to-end technical problem-solving, architectural implementation, and measurable results delivery, seeking to leverage verified capabilities for the ${safeRole} role.`;
   }
@@ -584,10 +771,13 @@ export const tailorResumeWithEvidence = async ({
       ? structuredTailored.achievements
       : baseResume.achievements;
 
-  // Collect all bullets for scoring recalculation
+  // Collect all bullets for scoring recalculation safely without any null values
   const allBullets = [];
-  finalProjects.forEach((p) => {
-    (p.bullets || []).forEach((b) => allBullets.push({ skill: p.name, improvedBullet: b }));
+  finalProjects.filter(Boolean).forEach((p) => {
+    const list = Array.isArray(p.bullets) ? p.bullets : [];
+    list.filter((b) => b !== null && b !== undefined && String(b).trim().length > 0).forEach((b) => {
+      allBullets.push({ skill: p.name || "Project", improvedBullet: String(b) });
+    });
   });
 
   const skillsFlat = Object.values(finalSkills).flat().join(", ");
@@ -598,10 +788,14 @@ export const tailorResumeWithEvidence = async ({
     `\n\n[CONFIRMED SKILLS]\n${skillsFlat}`,
     `\n\n[VERIFIED PROJECTS & HIGHLIGHTS]\n` +
       finalProjects
+        .filter(Boolean)
         .map(
           (p) =>
-            `Project: ${p.name} | Role: ${p.role || ""} | Tech: ${p.techStack || ""}\n` +
-            (p.bullets || []).map((b) => `• ${b}`).join("\n")
+            `Project: ${p.name || ""} | Role: ${p.role || ""} | Tech: ${p.techStack || ""}\n` +
+            (Array.isArray(p.bullets) ? p.bullets : [])
+              .filter((b) => b !== null && b !== undefined && String(b).trim().length > 0)
+              .map((b) => `• ${b}`)
+              .join("\n")
         )
         .join("\n\n"),
   ].join("\n");

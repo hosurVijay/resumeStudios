@@ -39,7 +39,7 @@ const upload = multer({
 // Middleware to upload the temp image to Cloudinary & auto-delete local file
 const processUpload = asyncHandler(async (req, res, next) => {
   if (!req.file) {
-    return next(new ApiError(400, "No file uploaded"));
+    return next();
   }
 
   try {

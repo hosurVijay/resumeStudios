@@ -61,12 +61,25 @@ export const getUserResumes = async (userId) => {
   const query = `
     SELECT 
       r.id, r.title, r.original_file_name, r.parsed_content, r.created_at, r.updated_at,
-      ja.id as application_id, ja.target_role, ja.target_company, ja.initial_score, ja.status
+      ja.id as application_id, ja.target_role, ja.target_company, ja.initial_score, ja.updated_score, ja.status,
+      COALESCE(
+        (SELECT rv.score_snapshot FROM resume_versions rv WHERE rv.application_id = ja.id ORDER BY rv.version_number DESC LIMIT 1),
+        ja.updated_score,
+        ja.initial_score,
+        0
+      ) AS current_score,
+      COALESCE(
+        (SELECT rv.is_approved FROM resume_versions rv WHERE rv.application_id = ja.id ORDER BY rv.version_number DESC LIMIT 1),
+        (ja.status = 'approved'),
+        FALSE
+      ) AS is_approved,
+      (SELECT rv.id FROM resume_versions rv WHERE rv.application_id = ja.id ORDER BY rv.version_number DESC LIMIT 1) AS latest_version_id,
+      (SELECT rv.version_number FROM resume_versions rv WHERE rv.application_id = ja.id ORDER BY rv.version_number DESC LIMIT 1) AS latest_version_number
     FROM resumes r
     LEFT JOIN job_applications as ja 
       ON ja.resume_id = r.id
     WHERE r.user_id = ?
-    ORDER BY r.created_at DESC
+    ORDER BY r.created_at DESC, ja.id DESC
   `;
   const [result] = await db.execute(query, [userId]);
   return result;

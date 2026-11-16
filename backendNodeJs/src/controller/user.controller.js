@@ -308,36 +308,99 @@ export const verifyOtp = asyncHandler(async (req, res) => {
 });
 
 export const resetPassword = asyncHandler(async (req, res) => {
-  const { resetToken, newPassword } = req.body;
+  const { resetToken, otp, email, newPassword } = req.body;
 
-  if (!resetToken || !newPassword) {
-    throw new ApiError(400, "Reset token and new password are required.");
+  if (!newPassword) {
+    throw new ApiError(400, "New password is required.");
   }
 
-  let decodeToken;
-  try {
-    decodeToken = jwt.verify(
-      resetToken,
-      process.env.RESET_TOKEN_SECRET || "default_reset_secret_key"
-    );
-  } catch (error) {
-    throw new ApiError(401, "Invalid or expired reset token.");
-  }
+  let userId = null;
 
-  if (decodeToken.purpose !== "password_reset") {
-    throw new ApiError(401, "Invalid reset token purpose.");
+  // Option A: resetToken provided
+  if (resetToken) {
+    let decodeToken;
+    try {
+      decodeToken = jwt.verify(
+        resetToken,
+        process.env.RESET_TOKEN_SECRET || "default_reset_secret_key"
+      );
+    } catch (error) {
+      throw new ApiError(401, "Invalid or expired reset token.");
+    }
+
+    if (decodeToken.purpose !== "password_reset") {
+      throw new ApiError(401, "Invalid reset token purpose.");
+    }
+    userId = decodeToken.id;
+  }
+  // Option B: direct email and OTP provided
+  else if (email && otp) {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      throw new ApiError(404, "User not found.");
+    }
+
+    const otpUserRecord = await findLatestPasswordResetOtp(user.id);
+    if (!otpUserRecord) {
+      throw new ApiError(400, "No active OTP found or maximum attempts exceeded.");
+    }
+
+    const isExpired = new Date() > new Date(otpUserRecord.expiresAt);
+    const isOtpValid = await isPasswordCorrect(otp.toString(), otpUserRecord.otp_hash);
+
+    if (!isOtpValid || isExpired) {
+      await incrementOtpAttempts(otpUserRecord.id);
+      throw new ApiError(400, "Invalid OTP or OTP has expired.");
+    }
+
+    await markOTPused(otpUserRecord.id);
+    userId = user.id;
+  } else {
+    throw new ApiError(400, "Either a reset token or email and OTP are required.");
   }
 
   const hashedPassword = await hashPassword(newPassword);
-  const setNewPassword = await updatePassword(hashedPassword, decodeToken.id);
+  const setNewPassword = await updatePassword(hashedPassword, userId);
 
   if (!setNewPassword || setNewPassword.affectedRows === 0) {
     throw new ApiError(500, "Failed to update password.");
   }
 
-  return res
-    .status(200)
-    .json(new ApiResponse(200, "Password updated successfully.", null));
+  // Fetch updated user to generate tokens and userPayload
+  const user = await findUserById(userId);
+  if (!user) {
+    throw new ApiError(500, "User not found after password update.");
+  }
+
+  const { accessToken, refreshToken } = await generateAccessRefreshToken(user.id);
+
+  res.cookie("accessToken", accessToken, {
+    ...cookieOptions,
+    maxAge: Number(process.env.ACCESS_COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000,
+  });
+
+  res.cookie("refreshToken", refreshToken, {
+    ...cookieOptions,
+    maxAge: Number(process.env.REFRESH_COOKIE_MAX_AGE) || 10 * 24 * 60 * 60 * 1000,
+  });
+
+  const userPayload = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phoneNumber: user.phone_number,
+    profileImage: user.profileImage,
+    freeCredits: user.free_credits,
+    subscriptionStatus: user.subscription_status,
+  };
+
+  return res.status(200).json(
+    new ApiResponse(200, "Password updated successfully and session restored.", {
+      user: userPayload,
+      accessToken,
+      refreshToken,
+    })
+  );
 });
 
 export const getCurrentUser = asyncHandler(async (req, res) => {

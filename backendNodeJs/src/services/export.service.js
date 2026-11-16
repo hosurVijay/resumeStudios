@@ -38,14 +38,20 @@ export const generateAtsHtml = ({
   let projectsHtml = "";
   if (projects && projects.length) {
     projectsHtml = projects
+      .filter(Boolean)
       .map((p) => {
         const bullets = (p.bullets || [])
-          .map((b) => `<li style="margin-bottom: 4px; line-height: 1.45;">${b}</li>`)
+          .filter(Boolean)
+          .map((b) => {
+            const str = typeof b === "string" ? b : b?.improvedBullet || "";
+            return str ? `<li style="margin-bottom: 4px; line-height: 1.45;">${str}</li>` : "";
+          })
+          .filter(Boolean)
           .join("");
         return `
       <div style="margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; align-items: baseline;">
-          <span style="font-weight: 700; font-size: 10.5pt; color: #0f172a;">${p.name}${p.role ? ` — <span style="font-weight: 600; color: #475569;">${p.role}</span>` : ""}</span>
+          <span style="font-weight: 700; font-size: 10.5pt; color: #0f172a;">${p.name || "Project"}${p.role ? ` — <span style="font-weight: 600; color: #475569;">${p.role}</span>` : ""}</span>
         </div>
         ${p.techStack ? `<div style="font-size: 9pt; color: #475569; font-style: italic; margin-bottom: 4px;">Tech Stack: ${p.techStack}</div>` : ""}
         <ul style="margin: 4px 0 6px 18px; padding: 0; font-size: 9.5pt; color: #1e293b;">
@@ -57,7 +63,12 @@ export const generateAtsHtml = ({
       .join("");
   } else if (bulletImprovements && bulletImprovements.length) {
     const bullets = bulletImprovements
-      .map((b) => `<li style="margin-bottom: 4px; line-height: 1.45;">${b.improvedBullet || b}</li>`)
+      .filter(Boolean)
+      .map((b) => {
+        const str = typeof b === "string" ? b : b?.improvedBullet || "";
+        return str ? `<li style="margin-bottom: 4px; line-height: 1.45;">${str}</li>` : "";
+      })
+      .filter(Boolean)
       .join("");
     projectsHtml = `<ul style="margin: 4px 0 6px 18px; padding: 0; font-size: 9.5pt; color: #1e293b;">${bullets}</ul>`;
   }
@@ -324,21 +335,27 @@ export const generateAtsPdf = ({
             doc.font("Helvetica-Oblique").fontSize(8.5).fillColor("#475569").text(`Tech Stack: ${p.techStack}`);
           }
           doc.moveDown(0.15);
-          (p.bullets || []).forEach((b) => {
-            doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${b}`, {
-              indent: 10,
-              lineGap: 1.5,
-            });
+          (p.bullets || []).filter(Boolean).forEach((b) => {
+            const bulletStr = typeof b === "string" ? b : b?.improvedBullet || "";
+            if (bulletStr && typeof bulletStr === "string") {
+              doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${bulletStr}`, {
+                indent: 10,
+                lineGap: 1.5,
+              });
+            }
           });
           doc.moveDown(0.3);
         });
       } else if (bulletImprovements && bulletImprovements.length) {
         renderSectionHeader("Projects & Experience");
-        bulletImprovements.forEach((b) => {
-          doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${b.improvedBullet || b}`, {
-            indent: 10,
-            lineGap: 1.5,
-          });
+        bulletImprovements.filter(Boolean).forEach((b) => {
+          const bulletStr = typeof b === "string" ? b : b?.improvedBullet || "";
+          if (bulletStr && typeof bulletStr === "string") {
+            doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${bulletStr}`, {
+              indent: 10,
+              lineGap: 1.5,
+            });
+          }
         });
       }
 

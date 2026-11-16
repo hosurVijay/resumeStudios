@@ -104,11 +104,22 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
     initialScore: scoringResult.score,
   });
 
+  const baseResume = parseOriginalResumeSections(resumeText, req.user?.name);
+  const originalContent = {
+    name: baseResume.name,
+    contact: baseResume.contact,
+    summary: baseResume.summary,
+    skills: baseResume.skills,
+    projects: baseResume.projects,
+    education: baseResume.education,
+    achievements: baseResume.achievements,
+  };
+
   await createResumeVersion({
     applicationId: applicationResult.insertId,
     userId,
     versionNumber: 1,
-    tailoredContent: { rawText: resumeText },
+    tailoredContent: { rawText: resumeText, originalContent },
     scoreSnapshot: scoringResult.score,
     isApproved: false,
   });
@@ -125,6 +136,7 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
       mandatoryGaps: scoringResult.mandatoryGaps,
       breakdown: scoringResult.breakdown,
       disclaimer: scoringResult.disclaimer,
+      originalContent,
     }),
   );
 });
@@ -339,6 +351,32 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Job application not found.");
   }
 
+  const user = await findUserById(userId);
+  if (!user) {
+    throw new ApiError(404, "User not found.");
+  }
+  const isSubscribed = user.subscription_status === "active";
+
+  // Consume credit immediately upon advancing from Step 2 to generate tailored resume
+  if (!isSubscribed) {
+    if ((user.free_credits ?? 0) <= 0) {
+      throw new ApiError(
+        403,
+        "You have 0 tailoring credits remaining. Please upgrade your subscription to tailor your resume."
+      );
+    }
+    const deducted = await deductUserCredit(
+      userId,
+      `Tailored resume version for application #${applicationId} (${app.target_role || "Role"})`
+    );
+    if (!deducted) {
+      throw new ApiError(
+        403,
+        "Insufficient credits. Please upgrade your subscription to tailor your resume."
+      );
+    }
+  }
+
   const evidenceItems = await getEvidenceItems(applicationId);
   const parsedContent = typeof app.parsed_content === "string"
     ? JSON.parse(app.parsed_content)
@@ -348,7 +386,6 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
     ? JSON.parse(app.extracted_requirements)
     : app.extracted_requirements || [];
 
-  const user = await findUserById(userId);
   const { originalContent, tailoredContent, scoringResult } = await tailorResumeWithEvidence({
     rawResumeText,
     jobDescription: app.job_description,
@@ -375,6 +412,9 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
     originalContent,
   });
 
+  const updatedUser = await findUserById(userId);
+  const remainingCredits = updatedUser?.free_credits ?? 0;
+
   return res.status(200).json(
     new ApiResponse(200, "Tailored resume generated successfully.", {
       versionId: versionResult.insertId,
@@ -385,6 +425,8 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
       tailoredContent,
       breakdown: scoringResult.breakdown,
       mandatoryGaps: scoringResult.mandatoryGaps,
+      remainingCredits,
+      isSubscribed,
     })
   );
 });
@@ -406,20 +448,7 @@ export const approveVersion = asyncHandler(async (req, res) => {
   if (version.is_approved) {
     return res
       .status(200)
-      .json(new ApiResponse(200, "This version is already approved.", { versionId }));
-  }
-
-  const user = await findUserById(userId);
-  const isSubscribed = user?.subscription_status === "active";
-
-  if (!isSubscribed) {
-    if (user.free_credits <= 0) {
-      throw new ApiError(
-        403,
-        "You have 0 free update credits remaining. Please upgrade your subscription to approve updates."
-      );
-    }
-    await deductUserCredit(userId, `Approved resume version ${version.version_number}`);
+      .json(new ApiResponse(200, "This version is already approved.", { versionId, isApproved: true }));
   }
 
   await approveResumeVersion(versionId, applicationId, userId);
@@ -427,9 +456,7 @@ export const approveVersion = asyncHandler(async (req, res) => {
   return res.status(200).json(
     new ApiResponse(
       200,
-      isSubscribed
-        ? "Version approved successfully under active subscription."
-        : "Version approved successfully. 1 credit deducted.",
+      "Version approved successfully.",
       { versionId, isApproved: true }
     )
   );

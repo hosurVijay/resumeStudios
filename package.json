@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm --prefix backendNodeJs install && npm --prefix frontendReactJs install && npm --prefix frontendReactJs run build",
+    "build": "npm --prefix backendNodeJs install && npm --prefix frontendReactJs install --include=dev && npm --prefix frontendReactJs run build",
     "start": "node backendNodeJs/src/index.js"
   }
 }

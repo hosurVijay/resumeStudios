@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import cookieParser from "cookie-parser";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import userRoute from "./routes/user.route.js";
 import authRouter from "./routes/auth.route.js";
@@ -12,12 +13,21 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Trust reverse proxy for secure cookies on Render, Heroku, etc.
+app.set("trust proxy", 1);
+
+const getAllowedOrigins = () => {
+  const envOrigin = process.env.CORS_ORIGIN;
+  if (!envOrigin || envOrigin === "*") return true;
+  if (envOrigin.includes(",")) {
+    return envOrigin.split(",").map((o) => o.trim().replace(/\/$/, ""));
+  }
+  return envOrigin.trim().replace(/\/$/, "");
+};
+
 app.use(
   cors({
-    origin:
-      process.env.CORS_ORIGIN === "*"
-        ? true
-        : process.env.CORS_ORIGIN || "http://localhost:5173",
+    origin: getAllowedOrigins(),
     credentials: true,
   }),
 );
@@ -37,6 +47,20 @@ app.get("/api/health", (req, res) => {
 app.use("/api/v1/users", userRoute);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/resumes", resumeRoute);
+
+// Serve frontend static production build if present (Unified Single-Service Deployment)
+const frontendDistPath = path.resolve(__dirname, "../../frontendReactJs/dist");
+
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+
+  app.get("{*path}", (req, res, next) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+}
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;

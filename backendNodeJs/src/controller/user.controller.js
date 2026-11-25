@@ -26,10 +26,13 @@ import { sendMailOtp } from "../utils/sendOtp.js";
 import { generateOtp } from "../utils/generateOtp.js";
 import jwt from "jsonwebtoken";
 
+const isProduction =
+  process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "true";
+
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.COOKIE_SECURE === "true",
-  sameSite: "lax",
+  secure: isProduction,
+  sameSite: isProduction ? "none" : (process.env.COOKIE_SAMESITE || "lax"),
 };
 
 const isPromoActive = () => process.env.LAUNCH_UNLIMITED_CREDITS !== "false";

@@ -35,7 +35,17 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await api.post("/users/register", formData);
+      const response = await api.post("/users/register", formData);
+      const data = response.data?.data;
+
+      // If user was auto-logged in (e.g. cloud host firewalled SMTP or matching user recovery)
+      if (data?.user && data?.requiresOtp === false) {
+        dispatch(login(data.user));
+        toast.success(response.data?.message || "Welcome to ResumeStudio! Your account is ready.");
+        navigate("/dashboard");
+        return;
+      }
+
       toast.info("Verification code sent to your email.");
       setShowOtpModal(true);
     } catch (err) {

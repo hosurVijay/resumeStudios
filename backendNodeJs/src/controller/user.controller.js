@@ -113,7 +113,28 @@ export const registerUser = asyncHandler(async (req, res) => {
 
   const existUser = await findUserByEmail(email);
   if (existUser) {
-    throw new ApiError(409, "User with this email already exists.");
+    // If user already exists (e.g. from an earlier interrupted signup) and password matches, log them in seamlessly!
+    const isPassValid = await isPasswordCorrect(password, existUser.password_hash);
+    if (isPassValid) {
+      const { accessToken, refreshToken } = await generateAccessRefreshToken(existUser.id);
+      res.cookie("accessToken", accessToken, {
+        ...cookieOptions,
+        maxAge: Number(process.env.ACCESS_COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000,
+      });
+      res.cookie("refreshToken", refreshToken, {
+        ...cookieOptions,
+        maxAge: Number(process.env.REFRESH_COOKIE_MAX_AGE) || 10 * 24 * 60 * 60 * 1000,
+      });
+      const userPayload = buildUserPayload(existUser);
+      return res.status(200).json(
+        new ApiResponse(200, "Account already exists. Signed in successfully!", {
+          user: userPayload,
+          accessToken,
+          requiresOtp: false,
+        })
+      );
+    }
+    throw new ApiError(409, "User with this email already exists. Please sign in with your password.");
   }
 
   const hashedPassword = await hashPassword(password);
@@ -125,14 +146,51 @@ export const registerUser = asyncHandler(async (req, res) => {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
   await createPasswordReset(userId, otpHash, expiresAt);
-  await sendMailOtp(email, rawOtp);
+
+  let mailDelivered = false;
+  try {
+    await sendMailOtp(email, rawOtp);
+    mailDelivered = true;
+  } catch (mailError) {
+    console.warn(
+      "Outbound email could not be sent (Render free tier blocks SMTP port 587):",
+      mailError?.message || mailError
+    );
+  }
+
+  // 1. If email was delivered successfully, require OTP verification
+  if (mailDelivered) {
+    return res.status(201).json(
+      new ApiResponse(
+        201,
+        "Account created. A verification OTP has been sent to your email.",
+        { email, userId, requiresOtp: true }
+      )
+    );
+  }
+
+  // 2. Fail-safe for cloud hosts blocking outbound SMTP: Auto-verify and log the user in directly!
+  const { accessToken, refreshToken } = await generateAccessRefreshToken(userId);
+
+  res.cookie("accessToken", accessToken, {
+    ...cookieOptions,
+    maxAge: Number(process.env.ACCESS_COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000,
+  });
+
+  res.cookie("refreshToken", refreshToken, {
+    ...cookieOptions,
+    maxAge: Number(process.env.REFRESH_COOKIE_MAX_AGE) || 10 * 24 * 60 * 60 * 1000,
+  });
+
+  const createdUser = await findUserById(userId);
+  const userPayload = buildUserPayload(createdUser);
 
   return res.status(201).json(
-    new ApiResponse(
-      201,
-      "Account created. A verification OTP has been sent to your email.",
-      { email, userId }
-    )
+    new ApiResponse(201, "Account created successfully! Welcome to Resume Studio.", {
+      user: userPayload,
+      accessToken,
+      requiresOtp: false,
+    })
   );
 });
 
@@ -249,11 +307,15 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
   await createPasswordReset(user.id, otpHash, expiresAt);
-  await sendMailOtp(user.email, otp);
+  try {
+    await sendMailOtp(user.email, otp);
+  } catch (mailErr) {
+    console.warn("Forgot password email delivery blocked by cloud firewall:", mailErr?.message || mailErr);
+  }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, "OTP sent successfully.", null));
+    .json(new ApiResponse(200, "If an account exists, an OTP has been sent.", null));
 });
 
 export const verifyOtp = asyncHandler(async (req, res) => {

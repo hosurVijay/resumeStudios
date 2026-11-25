@@ -2,16 +2,22 @@ import { db } from "../db/index.js";
 
 const createUser = async (name, email, password, phoneNumber) => {
   try {
+    const isPromo = process.env.LAUNCH_UNLIMITED_CREDITS !== "false";
+    const initialCredits = isPromo ? 999 : 3;
+    const initialSubStatus = isPromo ? "active" : "none";
+
     const query = `
             INSERT INTO users
-            (name, email, password_hash, phone_number)
-            VALUES(?, ?, ?, ?) 
+            (name, email, password_hash, phone_number, free_credits, subscription_status)
+            VALUES(?, ?, ?, ?, ?, ?) 
         `;
     const [result] = await db.execute(query, [
       name,
       email,
       password,
       phoneNumber,
+      initialCredits,
+      initialSubStatus,
     ]);
     return result;
   } catch (error) {

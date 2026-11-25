@@ -46,7 +46,7 @@ export default function BrandLogo({ to = "/", showSubtitle = false, size = "md" 
           Resume<span className="text-[#0F4C3A] dark:text-emerald-400">Studio</span>
         </span>
         {showSubtitle && (
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wide mt-0.5">
+          <span className="hidden sm:block text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wide mt-0.5">
             Truth-Preserving AI
           </span>
         )}

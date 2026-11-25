@@ -15,6 +15,21 @@ export const toast = {
   info: (msg) => toastExternal.info(msg),
 };
 
+function cleanMessage(msg) {
+  if (!msg) return "";
+  const str = typeof msg === "string" ? msg : msg?.message || String(msg);
+  if (/err_network|network error|failed to fetch|load failed/i.test(str)) {
+    return "Network connection lost. Please check your internet connection.";
+  }
+  if (/econnrefused|etimedout|socket hang up/i.test(str)) {
+    return "Unable to reach server. Please check your internet connection.";
+  }
+  if (/internal server error|table '.*' doesn't exist|unexpected token in json/i.test(str)) {
+    return "Something went wrong on our end. Please try again in a moment.";
+  }
+  return str;
+}
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
@@ -23,8 +38,9 @@ export function ToastProvider({ children }) {
   }, []);
 
   const addToast = useCallback((message, type = "info") => {
+    const clean = type === "error" ? cleanMessage(message) : message;
     const id = Date.now() + Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message: clean, type }]);
 
     setTimeout(() => {
       removeToast(id);

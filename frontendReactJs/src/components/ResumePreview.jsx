@@ -165,9 +165,6 @@ function ResumeCard({
           <h2 className="text-xl font-bold uppercase tracking-wide text-slate-900 dark:text-white">
             {displayName}
           </h2>
-          <p className="text-xs font-semibold text-[#0F4C3A] dark:text-emerald-400 mt-0.5">
-            {content.targetRoleTitle || targetRole}
-          </p>
 
           <div className="flex flex-wrap items-center justify-center gap-2.5 text-[11px] text-slate-600 dark:text-slate-400 mt-2">
             {contact.email && (
@@ -1123,7 +1120,7 @@ export default function ResumePreview({
                 className="flex items-center justify-center gap-1.5 text-xs font-bold bg-[#0F4C3A] hover:bg-[#0A382A] disabled:opacity-50 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
               >
                 <CheckCircle className="w-4 h-4" />
-                <span>{isApproving ? "Approving..." : "Approve & Download (1 Credit)"}</span>
+                <span>{isApproving ? "Approving..." : "Approve & Download"}</span>
               </button>
             </div>
           </>
@@ -1164,12 +1161,13 @@ export default function ResumePreview({
               </button>
 
               <button
-                onClick={() => onDownload("txt")}
-                disabled={downloadingFormat === "txt"}
+                onClick={() => onDownload("docx")}
+                disabled={downloadingFormat === "docx"}
                 className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
+                title="Download ATS Word DOCX resume"
               >
                 <FileText className="w-3.5 h-3.5" />
-                <span>Export TXT</span>
+                <span>DOCX (Word)</span>
               </button>
             </div>
           </>

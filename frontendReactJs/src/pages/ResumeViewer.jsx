@@ -115,6 +115,8 @@ export default function ResumeViewer() {
       const mimeType =
         format === "pdf"
           ? "application/pdf"
+          : format === "docx"
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           : format === "txt"
           ? "text/plain;charset=utf-8"
           : "text/html;charset=utf-8";
@@ -261,11 +263,12 @@ export default function ResumeViewer() {
               </button>
 
               <button
-                onClick={() => handleDownload("txt")}
-                disabled={downloadingFormat === "txt"}
+                onClick={() => handleDownload("docx")}
+                disabled={downloadingFormat === "docx"}
                 className="flex items-center gap-1 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 px-3 py-2 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                title="Download ATS Word DOCX resume"
               >
-                <span>TXT</span>
+                <span>DOCX (Word)</span>
               </button>
             </div>
           )}
@@ -400,11 +403,6 @@ export default function ResumeViewer() {
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
                 {resumeContent?.name || "Candidate Name"}
               </h2>
-              {(resumeContent?.targetRoleTitle || appData?.targetRole) && (
-                <p className="text-sm font-semibold text-[#0F4C3A] dark:text-emerald-400">
-                  {resumeContent?.targetRoleTitle || appData?.targetRole}
-                </p>
-              )}
 
               {/* Contact details line */}
               <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400">

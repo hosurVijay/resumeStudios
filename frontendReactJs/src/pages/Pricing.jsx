@@ -119,8 +119,12 @@ export default function Pricing() {
             </div>
 
             <div className="pt-2 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-4xl font-extrabold text-slate-900 dark:text-white">$19</span>
-              <span className="text-xs text-slate-500 ml-1.5 font-medium">/ month</span>
+              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
+                To Be Announced
+              </span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 block mt-1 font-medium">
+                Launch pricing will be revealed soon
+              </span>
             </div>
 
             <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">

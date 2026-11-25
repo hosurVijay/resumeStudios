@@ -32,6 +32,21 @@ const cookieOptions = {
   sameSite: "lax",
 };
 
+const isPromoActive = () => process.env.LAUNCH_UNLIMITED_CREDITS !== "false";
+
+const buildUserPayload = (user) => {
+  const promo = isPromoActive();
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phoneNumber: user.phone_number,
+    profileImage: user.profileImage,
+    freeCredits: promo ? Math.max(999, user.free_credits ?? 0) : user.free_credits,
+    subscriptionStatus: promo ? "active" : user.subscription_status,
+  };
+};
+
 const generateAccessRefreshToken = async (userId) => {
   const refreshToken = await generateRefreshToken(userId);
   const accessToken = await generateAccessToken(userId);
@@ -55,15 +70,7 @@ export const directLogin = asyncHandler(async (req, res) => {
       throw new ApiError(401, "Session expired. User not found.");
     }
 
-    const userPayload = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phoneNumber: user.phone_number,
-      profileImage: user.profileImage,
-      freeCredits: user.free_credits,
-      subscriptionStatus: user.subscription_status,
-    };
+    const userPayload = buildUserPayload(user);
 
     return res
       .status(200)
@@ -86,15 +93,7 @@ export const directLogin = asyncHandler(async (req, res) => {
       maxAge: Number(process.env.ACCESS_COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000,
     });
 
-    const userPayload = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phoneNumber: user.phone_number,
-      profileImage: user.profileImage,
-      freeCredits: user.free_credits,
-      subscriptionStatus: user.subscription_status,
-    };
+    const userPayload = buildUserPayload(user);
 
     return res
       .status(200)
@@ -173,15 +172,7 @@ export const verifyRegistrationOtp = asyncHandler(async (req, res) => {
     maxAge: Number(process.env.REFRESH_COOKIE_MAX_AGE) || 10 * 24 * 60 * 60 * 1000,
   });
 
-  const userPayload = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phoneNumber: user.phone_number,
-    profileImage: user.profileImage,
-    freeCredits: user.free_credits,
-    subscriptionStatus: user.subscription_status,
-  };
+  const userPayload = buildUserPayload(user);
 
   return res.status(200).json(
     new ApiResponse(200, "Account verified and logged in successfully.", {
@@ -220,15 +211,7 @@ export const loginUser = asyncHandler(async (req, res) => {
     maxAge: Number(process.env.REFRESH_COOKIE_MAX_AGE) || 10 * 24 * 60 * 60 * 1000,
   });
 
-  const userPayload = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phoneNumber: user.phone_number,
-    profileImage: user.profileImage,
-    freeCredits: user.free_credits,
-    subscriptionStatus: user.subscription_status,
-  };
+  const userPayload = buildUserPayload(user);
 
   return res
     .status(200)
@@ -385,15 +368,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
     maxAge: Number(process.env.REFRESH_COOKIE_MAX_AGE) || 10 * 24 * 60 * 60 * 1000,
   });
 
-  const userPayload = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phoneNumber: user.phone_number,
-    profileImage: user.profileImage,
-    freeCredits: user.free_credits,
-    subscriptionStatus: user.subscription_status,
-  };
+  const userPayload = buildUserPayload(user);
 
   return res.status(200).json(
     new ApiResponse(200, "Password updated successfully and session restored.", {
@@ -411,15 +386,7 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found.");
   }
 
-  const userPayload = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phoneNumber: user.phone_number,
-    profileImage: user.profileImage,
-    freeCredits: user.free_credits,
-    subscriptionStatus: user.subscription_status,
-  };
+  const userPayload = buildUserPayload(user);
 
   return res
     .status(200)
@@ -483,14 +450,7 @@ export const updateUserDetails = asyncHandler(async (req, res) => {
   }
 
   const updatedUser = await findUserById(userId);
-  const userPayload = {
-    id: updatedUser.id,
-    name: updatedUser.name,
-    email: updatedUser.email,
-    phoneNumber: updatedUser.phone_number,
-    profileImage: updatedUser.profileImage,
-    freeCredits: updatedUser.free_credits,
-  };
+  const userPayload = buildUserPayload(updatedUser);
 
   return res
     .status(200)

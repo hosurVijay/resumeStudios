@@ -13,6 +13,7 @@ import {
   Briefcase,
   CheckCircle,
   Eye,
+  Loader2,
 } from "lucide-react";
 import ScoreGraph from "../components/ScoreGraph.jsx";
 import { setResumes, setDashboardSeries } from "../store/resumeSlice.js";
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
+  const [resumeToDelete, setResumeToDelete] = useState(null);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -53,15 +55,15 @@ export default function Dashboard() {
     loadDashboardData();
   }, []);
 
-  const handleDeleteResume = async (resumeId) => {
-    if (!window.confirm("Are you sure you want to delete this resume? This will free up your account slot.")) {
-      return;
-    }
+  const confirmDeleteResume = async () => {
+    if (!resumeToDelete) return;
 
+    const resumeId = resumeToDelete.id;
     setDeletingId(resumeId);
     try {
       await api.delete(`/resumes/${resumeId}`);
       toast.success("Resume deleted successfully. Account slot freed.");
+      setResumeToDelete(null);
       await loadDashboardData();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete resume.");
@@ -70,15 +72,16 @@ export default function Dashboard() {
     }
   };
 
-  const isFree = userData?.subscriptionStatus !== "active";
+  const isPro = userData?.subscriptionStatus === "active" || (userData?.freeCredits ?? 0) > 100;
+  const isFree = !isPro;
   const hasResume = resumes.length > 0;
-  const canUpload = !isFree || !hasResume;
+  const canUpload = !hasResume;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-6 sm:space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Welcome back, {userData?.name || "Candidate"}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -86,32 +89,40 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-[#0F4C3A] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-[#0F4C3A] dark:text-emerald-400" />
-            <span>{userData?.freeCredits ?? 3} Free Updates Left</span>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-[#0F4C3A] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold shrink-0">
+            <Sparkles className="w-3.5 h-3.5 text-[#0F4C3A] dark:text-emerald-400 shrink-0" />
+            <span className="whitespace-nowrap">{isPro ? "Unlimited Credits" : `${userData?.freeCredits ?? 3} Free Updates Left`}</span>
           </div>
 
           <Link
-            to="/studio"
-            className={`flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl text-white shadow-sm transition-all ${
+            to={canUpload ? "/studio" : "#"}
+            onClick={(e) => {
+              if (!canUpload) {
+                e.preventDefault();
+                toast.error(
+                  "Maximum 1 active resume can be uploaded at a time. Please delete your existing resume below to upload a new one. Multi-resume subscription plans are on the way!"
+                );
+              }
+            }}
+            className={`inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3.5 sm:px-4 py-2 rounded-xl text-white shadow-sm transition-all whitespace-nowrap shrink-0 ${
               canUpload
-                ? "bg-[#0F4C3A] hover:bg-[#0A382A] shadow-sm hover:scale-[1.02]"
+                ? "bg-[#0F4C3A] hover:bg-[#0A382A] shadow-sm hover:scale-[1.02] cursor-pointer"
                 : "bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-80"
             }`}
           >
-            <PlusCircle className="w-4 h-4" />
+            <PlusCircle className="w-4 h-4 shrink-0" />
             <span>Tailor New Resume</span>
           </Link>
         </div>
       </div>
 
-      {isFree && hasResume && (
+      {hasResume && (
         <div className="flex items-center justify-between p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-xs border border-amber-200 dark:border-amber-800">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>
-              Free accounts can save 1 resume at a time. To tailor for another job description, delete your existing resume or upgrade to Pro.
+              Maximum 1 active resume can be uploaded at a time. To tailor a new resume, please delete your existing resume below. Our multi-resume subscription feature is on the way!
             </span>
           </div>
         </div>
@@ -127,7 +138,7 @@ export default function Dashboard() {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-[#0F4C3A] dark:text-emerald-400" />
             My Resumes & Job Applications
           </h2>
@@ -137,17 +148,17 @@ export default function Dashboard() {
         </div>
 
         {resumes.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 p-12 text-center bg-slate-50/50 dark:bg-slate-900/30">
-            <FileText className="w-12 h-12 mx-auto text-slate-400 dark:text-slate-600 mb-3" />
+          <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 p-6 sm:p-12 text-center bg-slate-50/50 dark:bg-slate-900/30">
+            <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-slate-400 dark:text-slate-600 mb-2 sm:mb-3" />
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
               No Resumes Tailored Yet
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
               Upload your base resume and paste a target job description to get your gap analysis and ATS alignment score.
             </p>
             <Link
               to="/studio"
-              className="inline-flex items-center gap-1.5 mt-4 text-xs font-semibold bg-[#0F4C3A] hover:bg-[#0A382A] text-white px-4 py-2 rounded-xl shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 mt-4 text-xs font-semibold bg-[#0F4C3A] hover:bg-[#0A382A] text-white px-4 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               <span>Tailor Your First Resume</span>
@@ -252,7 +263,7 @@ export default function Dashboard() {
                       )}
 
                       <button
-                        onClick={() => handleDeleteResume(item.id)}
+                        onClick={() => setResumeToDelete(item)}
                         disabled={deletingId === item.id}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
                         title="Delete resume"
@@ -267,6 +278,60 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal Popup */}
+      {resumeToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Delete Resume
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {resumeToDelete.target_role || resumeToDelete.title || "Selected Resume"}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Are you sure you want to delete this resume? This will permanently remove your tailored versions and free up your active slot to upload a new resume.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setResumeToDelete(null)}
+                disabled={deletingId !== null}
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteResume}
+                disabled={deletingId !== null}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              >
+                {deletingId ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Resume</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

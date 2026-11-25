@@ -1,22 +1,17 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { ApiError } from "../utils/apiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
-// 1. Profile Image Disk Storage (Temporary before Cloudinary upload)
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "public/temp");
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "_" + Math.round(Math.random() * 1e9);
-    const extension = path.extname(file.originalname);
-    const baseName = path.parse(file.originalname).name.replace(/\s+/g, "_");
-    cb(null, `${baseName}_${uniqueSuffix}${extension}`);
-  },
-});
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const UPLOADS_DIR = path.resolve(__dirname, "../../public/uploads/profileImages");
+
+// 1. Profile Image In-Memory Storage (No temporary files on disk)
+const storage = multer.memoryStorage();
 
 const imageFilter = (req, file, cb) => {
   const allowedType = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
@@ -33,33 +28,48 @@ const imageFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   fileFilter: imageFilter,
-  limits: { fileSize: 10 * 1024 * 1024, files: 2 },
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
 });
 
-// Middleware to upload the temp image to Cloudinary & auto-delete local file
+// Middleware to upload in-memory image to Cloudinary with seamless local storage fallback
 const processUpload = asyncHandler(async (req, res, next) => {
   if (!req.file) {
     return next();
   }
 
+  // 1. Try uploading to Cloudinary
   try {
-    const result = await uploadToCloudinary(req.file.path);
-    if (!result) {
-      throw new ApiError(500, "Cloudinary upload failed");
+    const result = await uploadToCloudinary(req.file);
+    if (result?.secure_url) {
+      req.file.cloudinaryUrl = result.secure_url;
+      req.file.publicId = result.public_id;
+      return next();
+    }
+  } catch (error) {
+    const detailMsg = error?.error?.message || error?.message || "Upload rejected by Cloudinary";
+    console.warn(
+      `Cloudinary upload failed (${detailMsg}). Falling back to local storage automatically.`
+    );
+  }
+
+  // 2. Seamless local disk storage fallback (guarantees profile upload never fails)
+  try {
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     }
 
-    req.file.cloudinaryUrl = result.secure_url;
-    req.file.publicId = result.public_id;
-  } catch (error) {
-    throw error;
-  } finally {
-    try {
-      if (req.file.path && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-    } catch (cleanupError) {
-      console.error("Failed to delete the temporary file:", cleanupError);
-    }
+    const rawExt = path.extname(req.file.originalname) || "";
+    const ext = rawExt.length > 1 ? rawExt : ".jpg";
+    const filename = `profile_${req.user?.id || Date.now()}_${Date.now()}${ext}`;
+    const targetPath = path.join(UPLOADS_DIR, filename);
+
+    fs.writeFileSync(targetPath, req.file.buffer);
+
+    req.file.cloudinaryUrl = `/uploads/profileImages/${filename}`;
+    req.file.publicId = filename;
+  } catch (localError) {
+    console.error("Local disk storage fallback failed:", localError);
+    throw new ApiError(500, "Failed to save profile image to local storage.");
   }
 
   next();

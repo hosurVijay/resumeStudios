@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import JSZip from "jszip";
 
 export const generateAtsHtml = ({
   candidateName,
@@ -324,7 +325,6 @@ export const generateAtsHtml = ({
 <body>
   <div class="header">
     <h1 class="name">${safeName}</h1>
-    <div class="role-title">${safeRole}</div>
     ${contactHtml ? `<div class="contact-line">${contactHtml}</div>` : ""}
   </div>
 
@@ -458,13 +458,292 @@ export const generateAtsPlainText = ({
   }
 
   return `${safeName.toUpperCase()}
-${safeRole}
 ${contactParts.join(" | ")}
 ============================================================
 
 ${bodyText}
 ============================================================
 `;
+};
+
+export const generateAtsDocx = async ({
+  candidateName,
+  targetRole,
+  contact = {},
+  summary = "",
+  skills = {},
+  projects = [],
+  education = [],
+  achievements = [],
+  bulletImprovements = [],
+  sections = [],
+}) => {
+  const safeName = (candidateName || "Candidate").toUpperCase();
+  const safeRole = targetRole || "Software Engineer";
+
+  const contactParts = [];
+  if (contact.email) contactParts.push(contact.email);
+  if (contact.phone) contactParts.push(contact.phone);
+  if (contact.linkedin) contactParts.push(contact.linkedin.replace(/^https?:\/\//, ""));
+  if (contact.github) contactParts.push(contact.github.replace(/^https?:\/\//, ""));
+  if (contact.location) contactParts.push(contact.location);
+
+  const escapeXml = (unsafe = "") => {
+    return String(unsafe || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  };
+
+  const makeParagraph = (runs = [], options = {}) => {
+    const { align = "left", before = 0, after = 100, borderBottom = null, indent = null } = options;
+    let pPr = `<w:pPr>`;
+    if (align && align !== "left") {
+      pPr += `<w:jc w:val="${align}"/>`;
+    }
+    pPr += `<w:spacing w:before="${before}" w:after="${after}" w:line="260" w:lineRule="auto"/>`;
+    if (indent) {
+      pPr += `<w:ind w:left="${indent.left || 360}" w:hanging="${indent.hanging || 240}"/>`;
+    }
+    if (borderBottom) {
+      pPr += `<w:pBdr><w:bottom w:val="single" w:sz="${borderBottom.sz || 8}" w:space="${borderBottom.space || 4}" w:color="${borderBottom.color || "0F4C3A"}"/></w:pBdr>`;
+    }
+    pPr += `</w:pPr>`;
+
+    const runsXml = runs
+      .map((r) => {
+        if (typeof r === "string") {
+          return `<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="21"/><w:color w:val="1E293B"/></w:rPr><w:t xml:space="preserve">${escapeXml(r)}</w:t></w:r>`;
+        }
+        const { text = "", bold = false, italic = false, size = 21, color = "1E293B", font = "Calibri" } = r;
+        return `<w:r><w:rPr><w:rFonts w:ascii="${font}" w:hAnsi="${font}"/>${bold ? "<w:b/>" : ""}${italic ? "<w:i/>" : ""}<w:sz w:val="${size}"/><w:color w:val="${color}"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+      })
+      .join("");
+
+    return `<w:p>${pPr}${runsXml}</w:p>`;
+  };
+
+  const makeSectionHeader = (title) => {
+    return makeParagraph(
+      [{ text: title.toUpperCase(), bold: true, size: 23, color: "0F4C3A" }],
+      { before: 240, after: 80, borderBottom: { sz: 12, space: 4, color: "0F4C3A" } }
+    );
+  };
+
+  const makeBulletPoint = (text) => {
+    return makeParagraph(
+      [
+        { text: "• ", bold: true, size: 20, color: "0F4C3A" },
+        { text: text, size: 20, color: "1E293B" }
+      ],
+      { indent: { left: 480, hanging: 240 }, after: 60 }
+    );
+  };
+
+  const bodyParts = [];
+
+  // Header - Name
+  bodyParts.push(makeParagraph([{ text: safeName, bold: true, size: 36, color: "0F172A" }], { align: "center", after: 40 }));
+
+  // Contact info
+  if (contactParts.length) {
+    bodyParts.push(
+      makeParagraph(
+        [{ text: contactParts.join("  •  "), size: 18, color: "64748B" }],
+        { align: "center", after: 140, borderBottom: { sz: 6, space: 6, color: "CBD5E1" } }
+      )
+    );
+  }
+
+  // Dynamic Sections
+  if (Array.isArray(sections) && sections.length > 0) {
+    sections.forEach((sec) => {
+      if (!sec || !sec.title) return;
+      bodyParts.push(makeSectionHeader(sec.title));
+
+      if (sec.type === "summary") {
+        const text = sec.text || sec.rawContent || "";
+        if (text) {
+          bodyParts.push(makeParagraph([{ text, size: 21, color: "334155" }], { after: 120 }));
+        }
+      } else if (sec.type === "impact") {
+        (sec.bullets || []).filter(Boolean).forEach((b) => {
+          bodyParts.push(makeBulletPoint(b));
+        });
+      } else if (sec.type === "expertise") {
+        const items = (sec.items || []).join("  •  ");
+        if (items) {
+          bodyParts.push(makeParagraph([{ text: items, size: 21, color: "334155" }], { after: 100 }));
+        }
+      } else if (sec.type === "toolkit") {
+        const categories = sec.categories || {};
+        Object.entries(categories).forEach(([cat, list]) => {
+          const items = Array.isArray(list) ? list.join(", ") : list;
+          bodyParts.push(
+            makeParagraph(
+              [
+                { text: `${cat}: `, bold: true, size: 21, color: "0F172A" },
+                { text: items, size: 21, color: "334155" }
+              ],
+              { after: 60 }
+            )
+          );
+        });
+      } else if (sec.type === "skills") {
+        const items = Array.isArray(sec.items) ? sec.items.join("  •  ") : (sec.rawContent || "");
+        if (items) {
+          bodyParts.push(makeParagraph([{ text: items, size: 21, color: "334155" }], { after: 100 }));
+        }
+      } else if (sec.type === "experience") {
+        const projList = sec.projects || [];
+        projList.forEach((p) => {
+          const headerRuns = [{ text: p.name || "Project", bold: true, size: 22, color: "0F172A" }];
+          if (p.role) headerRuns.push({ text: ` — ${p.role}`, italic: true, size: 21, color: "475569" });
+          if (p.period) headerRuns.push({ text: ` (${p.period})`, size: 19, color: "64748B" });
+          bodyParts.push(makeParagraph(headerRuns, { after: 40 }));
+
+          if (p.techStack) {
+            bodyParts.push(makeParagraph([{ text: `Tech Stack: ${p.techStack}`, italic: true, size: 19, color: "475569" }], { after: 40 }));
+          }
+
+          (p.bullets || []).filter(Boolean).forEach((b) => {
+            const str = typeof b === "string" ? b : b?.improvedBullet || "";
+            if (str) bodyParts.push(makeBulletPoint(str));
+          });
+        });
+      } else if (sec.type === "education") {
+        const items = sec.items || [];
+        items.forEach((e) => {
+          if (typeof e === "string") {
+            bodyParts.push(makeParagraph([{ text: e, size: 21, color: "334155" }], { after: 60 }));
+          } else {
+            const eduRuns = [{ text: e.degree || "", bold: true, size: 21, color: "0F172A" }];
+            if (e.period) eduRuns.push({ text: ` (${e.period})`, size: 19, color: "64748B" });
+            bodyParts.push(makeParagraph(eduRuns, { after: 20 }));
+
+            const instLine = `${e.institution || ""}${e.location ? ` — ${e.location}` : ""}${e.details ? ` | ${e.details}` : ""}`;
+            if (instLine) {
+              bodyParts.push(makeParagraph([{ text: instLine, size: 19, color: "475569" }], { after: 60 }));
+            }
+          }
+        });
+      } else if (sec.type === "recognition") {
+        (sec.bullets || []).filter(Boolean).forEach((a) => {
+          bodyParts.push(makeBulletPoint(a));
+        });
+      } else {
+        if (sec.rawLines && sec.rawLines.length) {
+          sec.rawLines.forEach((l) => bodyParts.push(makeBulletPoint(l)));
+        } else if (sec.rawContent) {
+          bodyParts.push(makeParagraph([{ text: sec.rawContent, size: 21, color: "334155" }], { after: 80 }));
+        }
+      }
+    });
+  } else {
+    // Legacy fallback
+    if (summary) {
+      bodyParts.push(makeSectionHeader("Professional Summary"));
+      bodyParts.push(makeParagraph([{ text: summary, size: 21, color: "334155" }], { after: 120 }));
+    }
+
+    if (skills) {
+      bodyParts.push(makeSectionHeader("Core Technical Skills"));
+      if (Array.isArray(skills)) {
+        bodyParts.push(makeParagraph([{ text: skills.join("  •  "), size: 21, color: "334155" }], { after: 100 }));
+      } else if (typeof skills === "object") {
+        Object.entries(skills).forEach(([cat, list]) => {
+          const items = Array.isArray(list) ? list.join(", ") : list;
+          bodyParts.push(
+            makeParagraph(
+              [
+                { text: `${cat}: `, bold: true, size: 21, color: "0F172A" },
+                { text: items, size: 21, color: "334155" }
+              ],
+              { after: 60 }
+            )
+          );
+        });
+      }
+    }
+
+    if (projects && projects.length) {
+      bodyParts.push(makeSectionHeader("Work Experience & Key Projects"));
+      projects.filter(Boolean).forEach((p) => {
+        const headerRuns = [{ text: p.name || "Project", bold: true, size: 22, color: "0F172A" }];
+        if (p.role) headerRuns.push({ text: ` — ${p.role}`, italic: true, size: 21, color: "475569" });
+        if (p.period) headerRuns.push({ text: ` (${p.period})`, size: 19, color: "64748B" });
+        bodyParts.push(makeParagraph(headerRuns, { after: 40 }));
+
+        if (p.techStack) {
+          bodyParts.push(makeParagraph([{ text: `Tech Stack: ${p.techStack}`, italic: true, size: 19, color: "475569" }], { after: 40 }));
+        }
+
+        (p.bullets || []).filter(Boolean).forEach((b) => {
+          const str = typeof b === "string" ? b : b?.improvedBullet || "";
+          if (str) bodyParts.push(makeBulletPoint(str));
+        });
+      });
+    }
+
+    if (education && education.length) {
+      bodyParts.push(makeSectionHeader("Education & Credentials"));
+      education.forEach((e) => {
+        if (typeof e === "string") {
+          bodyParts.push(makeParagraph([{ text: e, size: 21, color: "334155" }], { after: 60 }));
+        } else {
+          const eduRuns = [{ text: e.degree || "", bold: true, size: 21, color: "0F172A" }];
+          if (e.period) eduRuns.push({ text: ` (${e.period})`, size: 19, color: "64748B" });
+          bodyParts.push(makeParagraph(eduRuns, { after: 20 }));
+
+          const instLine = `${e.institution || ""}${e.location ? ` — ${e.location}` : ""}`;
+          if (instLine) {
+            bodyParts.push(makeParagraph([{ text: instLine, size: 19, color: "475569" }], { after: 60 }));
+          }
+        }
+      });
+    }
+
+    if (achievements && achievements.length) {
+      bodyParts.push(makeSectionHeader("Achievements & Certifications"));
+      achievements.forEach((a) => bodyParts.push(makeBulletPoint(a)));
+    }
+  }
+
+  const zip = new JSZip();
+  zip.file(
+    "[Content_Types].xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`
+  );
+
+  zip.file(
+    "_rels/.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+  );
+
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    ${bodyParts.join("\n")}
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="720" w:footer="720" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+  zip.file("word/document.xml", documentXml);
+
+  return await zip.generateAsync({ type: "nodebuffer" });
 };
 
 export const generateAtsPdf = ({
@@ -498,11 +777,7 @@ export const generateAtsPdf = ({
 
       // Header - Name
       doc.font("Helvetica-Bold").fontSize(18).fillColor("#0f172a").text(safeName, { align: "center" });
-      doc.moveDown(0.2);
-
-      // Target Role
-      doc.font("Helvetica-Bold").fontSize(11).fillColor("#2563eb").text(safeRole, { align: "center" });
-      doc.moveDown(0.2);
+      doc.moveDown(0.3);
 
       // Contact info
       const contactParts = [];

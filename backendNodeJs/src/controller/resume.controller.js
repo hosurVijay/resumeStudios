@@ -28,7 +28,12 @@ import {
   parseOriginalResumeSections,
   generateSummaryVariant,
 } from "../services/tailoring.service.js";
-import { generateAtsHtml, generateAtsPlainText, generateAtsPdf } from "../services/export.service.js";
+import {
+  generateAtsHtml,
+  generateAtsPlainText,
+  generateAtsPdf,
+  generateAtsDocx,
+} from "../services/export.service.js";
 
 const CHART_COLORS = [
   "#2563eb",
@@ -46,9 +51,42 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
   if (!req.file) {
     throw new ApiError(400, "Please upload a resume file (PDF or DOCX)");
   }
-  if (!targetRole || !jobDescription) {
-    throw new ApiError(400, "Target role and job description are required.");
+  if (!jobDescription || !jobDescription.trim()) {
+    throw new ApiError(400, "Job description is required.");
   }
+
+  // Attempt to extract clean job title from top lines of the JD if targetRole is omitted
+  const extractRoleFromJD = (jd = "") => {
+    const lines = jd.split("\n").map((l) => l.trim()).filter(Boolean);
+    for (const rawLine of lines.slice(0, 8)) {
+      const line = rawLine.replace(/^[*#\-_•\s]+|[*#\-_•\s]+$/g, "").trim();
+      const match = line.match(/^(?:job\s+title|title|role|position)\s*[:\-–—]\s*(.+)$/i);
+      if (match) {
+        const cleaned = match[1].replace(/^[*#\-_•\s]+|[*#\-_•\s]+$/g, "").trim();
+        if (cleaned.length >= 2 && cleaned.length <= 60) {
+          return cleaned;
+        }
+      }
+      if (
+        line.length <= 60 &&
+        /(?:developer|engineer|architect|lead|manager|analyst|specialist|designer|consultant|administrator)\b/i.test(line) &&
+        !/^(?:we\s+are|looking\s+for|about|responsibilities|requirements|qualifications|duties|overview)/i.test(line)
+      ) {
+        const cleaned = line
+          .replace(/^(?:job\s+title|title|role|position)\s*[:\-–—]\s*/i, "")
+          .replace(/^[*#\-_•\s]+|[*#\-_•\s]+$/g, "")
+          .trim();
+        if (cleaned.length >= 2 && cleaned.length <= 60) {
+          return cleaned;
+        }
+      }
+    }
+    return "";
+  };
+
+  const detectedRole = extractRoleFromJD(jobDescription);
+  const effectiveRole = (targetRole && targetRole.trim()) || detectedRole || "Software Engineer";
+  const storedRole = (targetRole && targetRole.trim()) || detectedRole || "Target Role";
 
   const user = await findUserById(userId);
   const isSubscribed = user?.subscription_status === "active";
@@ -58,7 +96,7 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
     if (existingCount >= 1) {
       throw new ApiError(
         403,
-        "Free accounts can save 1 resume at a time. Please delete your existing resume or upgrade to save multiple resumes.",
+        "Maximum 1 active resume can be uploaded at a time. Please delete your existing resume to upload a new one. Our multi-resume subscription feature is on the way!",
       );
     }
   }
@@ -68,7 +106,7 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
     req.file.mimetype,
   );
 
-  const requirements = scoringEngine.extractRequirements(jobDescription, targetRole, targetCompany);
+  const requirements = scoringEngine.extractRequirements(jobDescription, effectiveRole, targetCompany);
 
   if (!requirements || requirements.length === 0) {
     throw new ApiError(
@@ -77,9 +115,9 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
     );
   }
 
-  const scoringResult = scoringEngine.calculateScore(resumeText, requirements, targetRole, targetCompany);
+  const scoringResult = scoringEngine.calculateScore(resumeText, requirements, effectiveRole, targetCompany);
 
-  const resumeTitle = title || `${targetRole} Resume`;
+  const resumeTitle = title || `${storedRole} Resume`;
   const resumeResult = await createResume(
     userId,
     resumeTitle,
@@ -90,7 +128,7 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
   const applicationResult = await createJobApplication({
     userId,
     resumeId: resumeResult.insertId,
-    targetRole,
+    targetRole: storedRole,
     targetCompany: targetCompany || "",
     jobDescription,
     extractedRequirements: requirements.map((r) => ({
@@ -134,7 +172,7 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
     new ApiResponse(201, "Resume analyzed successfully", {
       resumeId: resumeResult.insertId,
       applicationId: applicationResult.insertId,
-      targetRole,
+      targetRole: storedRole,
       targetCompany,
       score: scoringResult.score,
       band: scoringResult.band,
@@ -364,7 +402,9 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
   if (!user) {
     throw new ApiError(404, "User not found.");
   }
-  const isSubscribed = user.subscription_status === "active";
+  // Check subscription and promotional launch period (Unlimited for all users during launch)
+  const isPromo = process.env.LAUNCH_UNLIMITED_CREDITS !== "false";
+  const isSubscribed = user.subscription_status === "active" || isPromo;
 
   // Consume credit immediately upon advancing from Step 2 to generate tailored resume
   if (!isSubscribed) {
@@ -424,7 +464,7 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
   });
 
   const updatedUser = await findUserById(userId);
-  const remainingCredits = updatedUser?.free_credits ?? 0;
+  const remainingCredits = isPromo ? 999 : (updatedUser?.free_credits ?? 0);
 
   return res.status(200).json(
     new ApiResponse(200, "Tailored resume generated successfully.", {
@@ -513,6 +553,13 @@ export const exportResumeVersion = asyncHandler(async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}.pdf"`);
     res.setHeader("Content-Type", "application/pdf");
     return res.send(pdfBuffer);
+  }
+
+  if (format === "docx") {
+    const docxBuffer = await generateAtsDocx(payload);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}.docx"`);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    return res.send(docxBuffer);
   }
 
   if (format === "txt") {

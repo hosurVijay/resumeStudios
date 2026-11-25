@@ -14,7 +14,7 @@ export default function ScoreGraph({
 
   if (!series || series.length === 0) {
     return (
-      <div className={`rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-center bg-slate-50/50 dark:bg-slate-900/30 ${compact ? "p-6" : "p-8"}`}>
+      <div className={`rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 text-center bg-slate-50/50 dark:bg-slate-900/30 ${compact ? "p-4 sm:p-6" : "p-5 sm:p-8"}`}>
         <TrendingUp className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-600 mb-2" />
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
           No Score Progression Yet

@@ -18,6 +18,7 @@ import {
 import { api } from "../api/client.js";
 import { login } from "../store/authSlice.js";
 import { toast } from "../components/Toast.jsx";
+import { getMediaUrl } from "../utils/mediaUrl.js";
 
 export default function Profile() {
   const dispatch = useDispatch();
@@ -127,7 +128,11 @@ export default function Profile() {
 
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-[#0F4C3A] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold self-start sm:self-auto">
           <Sparkles className="w-3.5 h-3.5 text-[#0F4C3A] dark:text-emerald-400" />
-          <span>{userData?.freeCredits ?? 3} Free Credits Available</span>
+          <span>
+            {userData?.subscriptionStatus === "active" || (userData?.freeCredits ?? 0) > 100
+              ? "Unlimited Credits"
+              : `${userData?.freeCredits ?? 3} Free Credits Available`}
+          </span>
         </div>
       </div>
 
@@ -143,7 +148,7 @@ export default function Profile() {
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-inner">
                 {imagePreview ? (
                   <img
-                    src={imagePreview}
+                    src={getMediaUrl(imagePreview)}
                     alt={name}
                     className="w-full h-full object-cover"
                   />
@@ -271,14 +276,20 @@ export default function Profile() {
             </span>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                {userData?.subscriptionStatus === "active" ? "Pro Plan" : "Starter Free Plan"}
+                {userData?.subscriptionStatus === "active" || (userData?.freeCredits ?? 0) > 100
+                  ? "Pro Plan (Launch Special)"
+                  : "Starter Free Plan"}
               </h3>
               <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-[#0F4C3A] dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                {userData?.freeCredits ?? 3} Credits Remaining
+                {userData?.subscriptionStatus === "active" || (userData?.freeCredits ?? 0) > 100
+                  ? "Unlimited Credits"
+                  : `${userData?.freeCredits ?? 3} Credits Remaining`}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
-              Free plans include 3 full ATS resume tailoring updates with deterministic scoring.
+              {userData?.subscriptionStatus === "active" || (userData?.freeCredits ?? 0) > 100
+                ? "Special promotional launch period: enjoy unlimited truth-preserving resume adaptations and ATS performance."
+                : "Free plans include 3 full ATS resume tailoring updates with deterministic scoring."}
             </p>
           </div>
 

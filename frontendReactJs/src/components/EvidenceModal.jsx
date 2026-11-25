@@ -15,6 +15,66 @@ import {
   X,
 } from "lucide-react";
 
+/**
+ * Extracts a concise, clean single technology or skill keyword from a requirement phrase
+ * (e.g. "Backend Architecture & REST APIs" -> "REST APIs", "Containerization with Docker" -> "Docker")
+ */
+export const extractCleanSkill = (label = "") => {
+  if (!label || typeof label !== "string") return "";
+  let str = label.trim();
+
+  // Known specific skills, tools, and frameworks (ordered by length descending)
+  const knownSkills = [
+    "REST APIs", "REST API", "GraphQL", "gRPC", "WebSockets", "Docker", "Kubernetes", "AWS", "Azure", "GCP",
+    "Redis", "MongoDB", "PostgreSQL", "MySQL", "SQL", "SQLite", "DynamoDB", "Cassandra",
+    "React.js", "React", "Node.js", "Express.js", "Next.js", "Vue.js", "Angular",
+    "Python", "JavaScript", "TypeScript", "Java", "C++", "C#", ".NET", "Golang", "Go", "Rust",
+    "Git", "GitHub", "GitLab", "CI/CD", "Linux", "Unix", "Bash", "Terraform", "Ansible",
+    "TensorFlow", "PyTorch", "Scikit-learn", "Machine Learning", "Deep Learning", "NLP",
+    "FastAPI", "Django", "Flask", "Spring Boot", "Tailwind CSS", "HTML", "CSS", "Postman",
+    "Jest", "Cypress", "Selenium", "Kafka", "RabbitMQ", "Elasticsearch", "Nginx", "Microservices"
+  ];
+
+  const sorted = [...knownSkills].sort((a, b) => b.length - a.length);
+  for (const skill of sorted) {
+    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`(?:\\b|^)${escaped}(?:\\b|$)`, "i");
+    if (regex.test(str)) {
+      return skill;
+    }
+  }
+
+  // Check parenthesized skill: e.g. "Cloud Computing (AWS)" -> "AWS"
+  const parenMatch = str.match(/\(([^)]+)\)/);
+  if (parenMatch && parenMatch[1].trim().length >= 2 && parenMatch[1].trim().length <= 25) {
+    return parenMatch[1].trim();
+  }
+
+  // Strip category & fluff prefixes
+  str = str.replace(
+    /^(?:backend|frontend|fullstack|software|cloud|data|system|web|devops|mobile)\s+(?:architecture|development|engineering|design|infrastructure|frameworks?|technologies|tools?)?\s*(?:&|\/|\+|and|with|using|in)?\s*/i,
+    ""
+  );
+  str = str.replace(/^(?:experience|proficiency|hands-on|knowledge|expertise)\s+(?:with|in|of)?\s*/i, "");
+  str = str.replace(/^(?:tools?|technologies|frameworks?|languages?)\s*(?:&|\/|:|\-)?\s*/i, "");
+
+  // If there's an '&', '/', 'with', or 'using', take the focused specific tool part
+  if (/&|\/|\bwith\b|\busing\b/i.test(str)) {
+    const parts = str.split(/&|\/|\bwith\b|\busing\b/i).map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      str = parts[parts.length - 1];
+    }
+  }
+
+  // Keep concise: pick last 1-2 words
+  const words = str.split(/\s+/).filter(Boolean);
+  if (words.length > 2) {
+    str = words.slice(-2).join(" ");
+  }
+
+  return str.trim() || label.trim();
+};
+
 export default function EvidenceModal({
   requirements = [],
   initialAnswers = [],
@@ -29,16 +89,26 @@ export default function EvidenceModal({
     const map = {};
     initialAnswers.forEach((ans) => {
       const label = ans.requirement_text || ans.requirementText;
+      const cleanSkill = extractCleanSkill(label);
       const ctx =
         typeof ans.context_data === "string"
           ? JSON.parse(ans.context_data || "{}")
           : ans.context_data || ans.contextData || {};
 
+      const existingTech = ctx.techUsed !== undefined ? ctx.techUsed : cleanSkill;
+      // If existing tech contains fluff prefix like 'Backend Architecture &', use clean skill
+      const finalTech =
+        !existingTech ||
+        existingTech === label ||
+        /^(?:backend|frontend|fullstack|cloud|data|system)\s+/i.test(existingTech)
+          ? cleanSkill
+          : existingTech;
+
       map[label] = {
         response: ans.candidate_response || ans.candidateResponse || "skip",
         context: {
           where: ctx.where || (existingProjects[0]?.name || ""),
-          techUsed: ctx.techUsed !== undefined ? ctx.techUsed : label,
+          techUsed: finalTech,
           whatDone: ctx.whatDone || ctx.task || "",
           measurableOutcomes: ctx.measurableOutcomes || ctx.outcome || "",
         },
@@ -51,15 +121,24 @@ export default function EvidenceModal({
     setAnswers((prev) => {
       const existing = prev[reqText] || {};
       const defaultWhere = existingProjects[0]?.name || "";
+      const cleanSkill = extractCleanSkill(reqText);
+      const existingTech = existing.context?.techUsed;
+      const finalTech =
+        !existingTech ||
+        existingTech === reqText ||
+        /^(?:backend|frontend|fullstack|cloud|data|system)\s+/i.test(existingTech)
+          ? cleanSkill
+          : existingTech;
+
       return {
         ...prev,
         [reqText]: {
           response: responseType,
           context: existing.context?.where
-            ? existing.context
+            ? { ...existing.context, techUsed: finalTech }
             : {
                 where: defaultWhere,
-                techUsed: existing.context?.techUsed || reqText,
+                techUsed: finalTech,
                 whatDone: "",
                 measurableOutcomes: "",
               },
@@ -101,8 +180,17 @@ export default function EvidenceModal({
     e.preventDefault();
     const formatted = requirements.map((req) => {
       const reqLabel = req.label || req.requirementText;
+      const cleanSkill = extractCleanSkill(reqLabel);
       const state = answers[reqLabel] || {};
       const ctx = state.context || {};
+
+      const existingTech = ctx.techUsed !== undefined ? ctx.techUsed : cleanSkill;
+      const finalTech =
+        !existingTech ||
+        existingTech === reqLabel ||
+        /^(?:backend|frontend|fullstack|cloud|data|system)\s+/i.test(existingTech)
+          ? cleanSkill
+          : existingTech;
 
       return {
         requirementText: reqLabel,
@@ -110,7 +198,7 @@ export default function EvidenceModal({
         candidateResponse: state.response || "skip",
         contextData: {
           where: ctx.where || existingProjects[0]?.name || "",
-          techUsed: ctx.techUsed !== undefined ? ctx.techUsed : reqLabel,
+          techUsed: finalTech,
           whatDone: ctx.whatDone || "",
           measurableOutcomes: ctx.measurableOutcomes || "",
         },
@@ -317,9 +405,15 @@ export default function EvidenceModal({
                                 </label>
                                 <input
                                   type="text"
-                                  value={current.context?.techUsed !== undefined ? current.context.techUsed : reqLabel}
+                                  value={
+                                    current.context?.techUsed !== undefined &&
+                                    current.context.techUsed !== reqLabel &&
+                                    !/^(?:backend|frontend|fullstack|cloud|data|system)\s+/i.test(current.context.techUsed)
+                                      ? current.context.techUsed
+                                      : extractCleanSkill(reqLabel)
+                                  }
                                   onChange={(e) => handleContextChange(reqLabel, "techUsed", e.target.value)}
-                                  placeholder="e.g. Redis, Docker, PostgreSQL"
+                                  placeholder="e.g. REST APIs, Redis, Docker"
                                   className="w-full text-xs px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-[#0F4C3A]/20"
                                 />
                                 {matchedExistingProject.techStack && (
@@ -350,7 +444,7 @@ export default function EvidenceModal({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Specific task / work accomplished with {reqLabel}
+                          Specific task / work accomplished with {extractCleanSkill(reqLabel) || reqLabel}
                         </label>
                         <input
                           type="text"
@@ -403,7 +497,7 @@ export default function EvidenceModal({
               disabled={isSubmitting}
               className="flex items-center gap-1.5 text-xs font-semibold bg-[#0F4C3A] hover:bg-[#0A382A] disabled:opacity-50 text-white px-5 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
             >
-              <span>{isSubmitting ? "Synthesizing Evidence & Applying Credit..." : "Confirm & Tailor Resume (1 Credit)"}</span>
+              <span>{isSubmitting ? "Synthesizing Evidence..." : "Confirm & Tailor Resume"}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

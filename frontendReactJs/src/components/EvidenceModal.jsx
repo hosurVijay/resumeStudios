@@ -19,6 +19,8 @@ export default function EvidenceModal({
   requirements = [],
   initialAnswers = [],
   existingProjects = [],
+  updateSummary = true,
+  summaryPreview = "",
   onSave,
   onClose,
   isSubmitting = false,
@@ -36,13 +38,9 @@ export default function EvidenceModal({
         response: ans.candidate_response || ans.candidateResponse || "skip",
         context: {
           where: ctx.where || (existingProjects[0]?.name || ""),
+          techUsed: ctx.techUsed !== undefined ? ctx.techUsed : label,
           whatDone: ctx.whatDone || ctx.task || "",
           measurableOutcomes: ctx.measurableOutcomes || ctx.outcome || "",
-          isCustomWhere: Boolean(
-            ctx.where &&
-            existingProjects.length > 0 &&
-            !existingProjects.some((p) => (p.name || "").toLowerCase() === (ctx.where || "").toLowerCase())
-          ),
         },
       };
     });
@@ -61,9 +59,9 @@ export default function EvidenceModal({
             ? existing.context
             : {
                 where: defaultWhere,
+                techUsed: existing.context?.techUsed || reqText,
                 whatDone: "",
                 measurableOutcomes: "",
-                isCustomWhere: false,
               },
         },
       };
@@ -87,31 +85,16 @@ export default function EvidenceModal({
   };
 
   const handleProjectSelect = (reqText, val) => {
-    if (val === "__NEW__") {
-      setAnswers((prev) => ({
-        ...prev,
-        [reqText]: {
-          ...prev[reqText],
-          context: {
-            ...prev[reqText]?.context,
-            where: "",
-            isCustomWhere: true,
-          },
+    setAnswers((prev) => ({
+      ...prev,
+      [reqText]: {
+        ...prev[reqText],
+        context: {
+          ...prev[reqText]?.context,
+          where: val,
         },
-      }));
-    } else {
-      setAnswers((prev) => ({
-        ...prev,
-        [reqText]: {
-          ...prev[reqText],
-          context: {
-            ...prev[reqText]?.context,
-            where: val,
-            isCustomWhere: false,
-          },
-        },
-      }));
-    }
+      },
+    }));
   };
 
   const handleSubmit = (e) => {
@@ -126,7 +109,8 @@ export default function EvidenceModal({
         isMandatory: req.priority === "mandatory" || req.isMandatory || false,
         candidateResponse: state.response || "skip",
         contextData: {
-          where: ctx.where || "",
+          where: ctx.where || existingProjects[0]?.name || "",
+          techUsed: ctx.techUsed !== undefined ? ctx.techUsed : reqLabel,
           whatDone: ctx.whatDone || "",
           measurableOutcomes: ctx.measurableOutcomes || "",
         },
@@ -162,6 +146,23 @@ export default function EvidenceModal({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {summaryPreview && (
+          <div className="mt-3 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-[#0F4C3A] dark:text-emerald-400 shrink-0" />
+              <span className="text-slate-600 dark:text-slate-400">
+                Summary Setting:{" "}
+                <strong className="text-slate-800 dark:text-slate-200">
+                  {updateSummary ? "Tailored ATS Summary (Active)" : "Original Resume Summary Preserved"}
+                </strong>
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-400 italic max-w-xs truncate hidden sm:inline">
+              "{summaryPreview.slice(0, 50)}..."
+            </span>
+          </div>
+        )}
 
         {/* Requirements Form List */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
@@ -283,39 +284,24 @@ export default function EvidenceModal({
                       {existingProjects.length > 0 ? (
                         <div className="space-y-2">
                           <select
-                            value={isCustomWhere ? "__NEW__" : currentWhere || existingProjects[0]?.name || ""}
+                            value={currentWhere || existingProjects[0]?.name || ""}
                             onChange={(e) => handleProjectSelect(reqLabel, e.target.value)}
                             className="w-full text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0F4C3A]/20 focus:border-[#0F4C3A]"
                           >
-                            <option value="" disabled>-- Select Candidate Resume Company / Project --</option>
                             {existingProjects.map((p, pIdx) => (
                               <option key={pIdx} value={p.name}>
                                 {p.name} {p.role ? `• ${p.role}` : ""}
                               </option>
                             ))}
-                            <option value="__NEW__">+ Add to New Company / Independent Project...</option>
                           </select>
-
-                          {/* Custom project name input if user chose new */}
-                          {isCustomWhere && (
-                            <div className="pt-1">
-                              <input
-                                type="text"
-                                value={currentWhere}
-                                onChange={(e) => handleContextChange(reqLabel, "where", e.target.value)}
-                                placeholder="Enter Company or Project Name (e.g. Acme Corp, Freelance Project)"
-                                className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0F4C3A]/20 focus:border-[#0F4C3A]"
-                              />
-                            </div>
-                          )}
 
                           {/* Existing section content preview card */}
                           {matchedExistingProject && (
-                            <div className="p-3 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-xs space-y-1.5">
+                            <div className="p-3.5 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-xs space-y-2.5">
                               <div className="flex items-center justify-between">
                                 <span className="font-bold text-[#0F4C3A] dark:text-emerald-300 flex items-center gap-1.5">
                                   <Building2 className="w-3.5 h-3.5" />
-                                  Target Section: {matchedExistingProject.name}
+                                  Existing Section: {matchedExistingProject.name}
                                 </span>
                                 {matchedExistingProject.role && (
                                   <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
@@ -324,24 +310,27 @@ export default function EvidenceModal({
                                 )}
                               </div>
 
-                              {matchedExistingProject.techStack && (
-                                <div className="text-[11px] text-slate-600 dark:text-slate-300">
-                                  <span className="font-semibold text-slate-700 dark:text-slate-200">Current Tech Stack:</span>{" "}
-                                  <span className="font-mono text-emerald-800 dark:text-emerald-400">
-                                    {matchedExistingProject.techStack}
+                              {/* Skills / Tech Used in this Section */}
+                              <div>
+                                <label className="block text-[11px] font-bold text-slate-800 dark:text-slate-200 mb-1">
+                                  Skills / Technologies used in this section:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={current.context?.techUsed !== undefined ? current.context.techUsed : reqLabel}
+                                  onChange={(e) => handleContextChange(reqLabel, "techUsed", e.target.value)}
+                                  placeholder="e.g. Redis, Docker, PostgreSQL"
+                                  className="w-full text-xs px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-2 focus:ring-[#0F4C3A]/20"
+                                />
+                                {matchedExistingProject.techStack && (
+                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 block">
+                                    Current section tech stack: <span className="italic">{matchedExistingProject.techStack}</span>
                                   </span>
-                                </div>
-                              )}
-
-                              {Array.isArray(matchedExistingProject.bullets) && matchedExistingProject.bullets.length > 0 && (
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                                  <span className="font-semibold text-slate-700 dark:text-slate-300">Existing Points:</span>{" "}
-                                  {matchedExistingProject.bullets.length} bullet point(s) recorded in this role
-                                </div>
-                              )}
+                                )}
+                              </div>
 
                               <p className="text-[10px] text-emerald-800 dark:text-emerald-300 font-medium">
-                                ✓ We will integrate <strong className="underline">{reqLabel}</strong> directly into {matchedExistingProject.name}'s tech stack and experience bullets without creating a separate new entry.
+                                🔒 100% Section Preservation: No new sections are created. This skill and accomplishment will be integrated directly into {matchedExistingProject.name} without altering your general Technical Skills list.
                               </p>
                             </div>
                           )}

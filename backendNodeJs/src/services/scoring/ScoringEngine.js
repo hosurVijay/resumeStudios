@@ -59,6 +59,12 @@ export class ScoringEngine {
     if (/\b(?:frontend|react|angular|vue|web\s+developer|ui\s+engineer|javascript\s+developer)\b/i.test(role)) {
       return "frontend";
     }
+    if (/\b(?:full[- ]?stack|software\s+engineer|software\s+developer|web\s+engineer|tech\s+lead|engineering\s+manager)\b/i.test(role)) {
+      return "fullstack";
+    }
+    if (/\b(?:product\s+manager|technical\s+product\s+manager|project\s+manager|program\s+manager|scrum\s+master|agile\s+coach)\b/i.test(role)) {
+      return "product";
+    }
     return "general";
   }
 
@@ -71,23 +77,54 @@ export class ScoringEngine {
     const rawJd = String(jdText || "").trim();
     if (!rawJd) return [];
 
-    const sentences = rawJd
-      .split(/\n|(?<=[.!?])\s+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    // Parse JD into structured lines with section tracking
+    const lines = rawJd.split("\n").map((l) => l.trim()).filter(Boolean);
+    const MANDATORY_HEADER_REGEX = /^(?:basic|minimum|required|essential|core|must\s+have)\s*(?:qualifications?|requirements?|skills?|criteria)?\s*:?$/i;
+    const PREFERRED_HEADER_REGEX = /^(?:preferred|desired|nice\s+to\s+have|bonus|additional|optional|plus|good\s+to\s+have|added\s+advantage)\s*(?:qualifications?|requirements?|skills?|criteria)?\s*:?$/i;
+    const GENERAL_HEADER_REGEX = /^(?:responsibilities|duties|overview|about\s+(?:the\s+)?(?:job|role|company|team|us)|what\s+you(?:'ll|\s+will)\s+do|scope|role\s+summary)\s*:?$/i;
 
+    let currentSection = "general"; // 'mandatory' | 'preferred' | 'general'
+    const sectionSentences = [];
+
+    for (const line of lines) {
+      if (MANDATORY_HEADER_REGEX.test(line)) {
+        currentSection = "mandatory";
+        continue;
+      }
+      if (PREFERRED_HEADER_REGEX.test(line)) {
+        currentSection = "preferred";
+        continue;
+      }
+      if (GENERAL_HEADER_REGEX.test(line)) {
+        currentSection = "general";
+        continue;
+      }
+
+      const sentenceParts = line
+        .split(/(?<=[.!?])\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      for (const part of sentenceParts) {
+        sectionSentences.push({ text: part, section: currentSection });
+      }
+    }
+
+    const sentences = sectionSentences.map((s) => s.text);
     const roleDomain = this.detectRoleDomain(targetRole);
     const addedRuleIds = new Set();
     const output = [];
 
-    // Domain prefix map to recognize core alignment
+    // Domain prefix map to recognize core domain alignment
     const domainPrefixMap = {
-      devops: "devops-",
-      aiml: "aiml-",
-      backend: "backend-",
-      frontend: "frontend-",
+      devops: ["devops-"],
+      aiml: ["aiml-"],
+      backend: ["backend-"],
+      frontend: ["frontend-"],
+      fullstack: ["backend-", "frontend-"],
+      product: ["exp-", "tier1-"],
     };
-    const currentDomainPrefix = domainPrefixMap[roleDomain] || "";
+    const domainPrefixes = domainPrefixMap[roleDomain] || [];
 
     // Scan all catalog rules against the provided Job Description
     for (const rule of this.catalogRules) {
@@ -95,28 +132,27 @@ export class ScoringEngine {
 
       let relevant = [];
       if (rule.type === "years") {
-        relevant = sentences.filter((s) => rule.extractYears(s) !== null);
+        relevant = sectionSentences.filter((s) => rule.extractYears(s.text) !== null);
       } else if (rule.terms && rule.terms.length) {
-        // Must match at least one term in the Job Description text
-        relevant = sentences.filter((s) => rule.terms.some((t) => rule.contains(s, t)));
+        relevant = sectionSentences.filter((s) => rule.terms.some((t) => rule.contains(s.text, t)));
       }
 
       // STRICT: If NOT mentioned anywhere in the Job Description, DO NOT extract it!
       if (!relevant.length) continue;
 
-      const sourceText = relevant.join("\n").slice(0, 2000);
+      const matchedTexts = relevant.map((r) => r.text);
+      const sourceText = matchedTexts.join("\n").slice(0, 2000);
 
-      // Check if the specific sentence containing the term explicitly marks it as optional/preferred
-      const isPreferred = /\b(plus|nice\s+to\s+have|preferred|optional|bonus|added\s+advantage|good\s+to\s+have)\b/i.test(
-        sourceText
-      );
-      const isExplicitMandatory = /\b(required|must|mandatory|minimum|essential|proven|strong|solid|hands-on|proficien|deep\s+understanding|expected|qualifications?|responsibilit)\b/i.test(
-        rawJd
-      );
+      // Section-level and sentence-level requirement priority detection
+      const hasSentencePreferred = /\b(plus|nice\s+to\s+have|preferred|optional|bonus|added\s+advantage|good\s+to\s+have)\b/i.test(sourceText);
+      const isUnderPreferredSection = relevant.some((r) => r.section === "preferred");
+      const isUnderMandatorySection = relevant.some((r) => r.section === "mandatory");
+      const hasSentenceMandatory = /\b(required|must|mandatory|minimum|essential|proven|strong|solid|hands-on|proficien|deep\s+understanding|expected)\b/i.test(sourceText);
 
-      // Core domain skills mentioned in the JD default to mandatory unless explicitly marked as optional/plus
-      const isDomainAligned = currentDomainPrefix && rule.id.startsWith(currentDomainPrefix);
-      const isMandatory = !isPreferred && (isExplicitMandatory || isDomainAligned);
+      const isDomainAligned = domainPrefixes.some((pfx) => rule.id.startsWith(pfx));
+
+      const isPreferred = hasSentencePreferred || isUnderPreferredSection;
+      const isMandatory = !isPreferred && (hasSentenceMandatory || isUnderMandatorySection || isDomainAligned);
 
       const requirementDef = {
         id: rule.id,

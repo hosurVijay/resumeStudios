@@ -41,9 +41,12 @@ export const extractResumeText = async (fileBuffer, mimetype) => {
     throw new ApiError(500, "Failed to read resume text. The document may be corrupted or password-protected.");
   }
 
-  // 3. Validation: Check if text is readable (handles scanned/image PDFs)
+  // 3. Validation and cleaning: strip page markers (e.g. "-- 1 of 2 --", "--2--2--", "Page 2 of 2") and artifacts
+  const PAGE_MARKER_GLOBAL_REGEX = /^\s*(?:--\s*\d+\s*(?:of|[-–—/]+)\s*\d+\s*--|--\s*\d+\s*--|-\s*\d+\s*-|\bpage\s+\d+(?:\s*(?:of|\/|-)\s*\d+)?\b|\b\d+\s*(?:of|\/)\s*\d+\b|undefined)\s*$/gim;
+
   const cleanedText = rawText
     .replace(/\r\n/g, "\n")
+    .replace(PAGE_MARKER_GLOBAL_REGEX, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 

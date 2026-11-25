@@ -11,6 +11,7 @@ export const generateAtsHtml = ({
   achievements = [],
   bulletImprovements = [],
   rawResumeText = "",
+  sections = [],
 }) => {
   const safeName = candidateName || "Candidate";
   const safeRole = targetRole || "Software Engineer";
@@ -23,70 +24,261 @@ export const generateAtsHtml = ({
   if (contact.location) contactItems.push(`<span>${contact.location}</span>`);
   const contactHtml = contactItems.join(" • ");
 
-  let skillsHtml = "";
-  if (Array.isArray(skills)) {
-    skillsHtml = `<p style="margin: 0; font-size: 10pt; line-height: 1.5; color: #334155;">${skills.join(" • ")}</p>`;
-  } else if (typeof skills === "object" && skills !== null) {
-    skillsHtml = Object.entries(skills)
-      .map(([cat, list]) => {
-        const items = Array.isArray(list) ? list.join(", ") : list;
-        return `<div style="margin-bottom: 4px; font-size: 9.5pt;"><strong style="color: #0f172a;">${cat}:</strong> <span style="color: #334155;">${items}</span></div>`;
+  // If authentic dynamic sections are provided, render them exactly as structured
+  let bodyContentHtml = "";
+  if (Array.isArray(sections) && sections.length > 0) {
+    bodyContentHtml = sections
+      .map((sec) => {
+        if (!sec || !sec.title) return "";
+
+        if (sec.type === "summary") {
+          const text = sec.text || sec.rawContent || "";
+          if (!text) return "";
+          return `
+            <div class="section-title">${sec.title}</div>
+            <p style="font-size: 9.5pt; text-align: justify; color: #334155; line-height: 1.5;">${text}</p>
+          `;
+        }
+
+        if (sec.type === "impact") {
+          const bullets = (sec.bullets || [])
+            .map((b) => `<li style="margin-bottom: 4px; line-height: 1.45;">${b}</li>`)
+            .join("");
+          if (!bullets) return "";
+          return `
+            <div class="section-title">${sec.title}</div>
+            <ul style="margin: 4px 0 6px 18px; padding: 0; font-size: 9.5pt; color: #1e293b;">
+              ${bullets}
+            </ul>
+          `;
+        }
+
+        if (sec.type === "expertise") {
+          const items = (sec.items || []).join(" • ");
+          if (!items) return "";
+          return `
+            <div class="section-title">${sec.title}</div>
+            <p style="margin: 0; font-size: 9.5pt; line-height: 1.5; color: #334155;">${items}</p>
+          `;
+        }
+
+        if (sec.type === "toolkit") {
+          const categories = sec.categories || {};
+          const catEntries = Object.entries(categories);
+          if (!catEntries.length) return "";
+          const catsHtml = catEntries
+            .map(([cat, list]) => {
+              const items = Array.isArray(list) ? list.join(", ") : list;
+              return `<div style="margin-bottom: 4px; font-size: 9.5pt;"><strong style="color: #0f172a;">${cat}:</strong> <span style="color: #334155;">${items}</span></div>`;
+            })
+            .join("");
+          return `
+            <div class="section-title">${sec.title}</div>
+            ${catsHtml}
+          `;
+        }
+
+        if (sec.type === "skills") {
+          const items = Array.isArray(sec.items) ? sec.items.join(" • ") : (sec.rawContent || "");
+          if (!items) return "";
+          return `
+            <div class="section-title">${sec.title}</div>
+            <p style="margin: 0; font-size: 10pt; line-height: 1.5; color: #334155;">${items}</p>
+          `;
+        }
+
+        if (sec.type === "experience") {
+          const projList = sec.projects || [];
+          if (!projList.length) return "";
+          const projsHtml = projList
+            .map((p) => {
+              const bullets = (p.bullets || [])
+                .filter(Boolean)
+                .map((b) => {
+                  const str = typeof b === "string" ? b : b?.improvedBullet || "";
+                  return str ? `<li style="margin-bottom: 4px; line-height: 1.45;">${str}</li>` : "";
+                })
+                .filter(Boolean)
+                .join("");
+              return `
+                <div style="margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <span style="font-weight: 700; font-size: 10.5pt; color: #0f172a;">${p.name || "Project"}${p.role ? ` — <span style="font-weight: 600; color: #475569;">${p.role}</span>` : ""}</span>
+                    ${p.period ? `<span style="font-size: 9pt; color: #64748b;">${p.period}</span>` : ""}
+                  </div>
+                  ${p.techStack ? `<div style="font-size: 9pt; color: #475569; font-style: italic; margin-bottom: 4px;">Tech Stack: ${p.techStack}</div>` : ""}
+                  <ul style="margin: 4px 0 6px 18px; padding: 0; font-size: 9.5pt; color: #1e293b;">
+                    ${bullets}
+                  </ul>
+                </div>
+              `;
+            })
+            .join("");
+          return `
+            <div class="section-title">${sec.title}</div>
+            ${projsHtml}
+          `;
+        }
+
+        if (sec.type === "education") {
+          const items = sec.items || [];
+          if (!items.length) return "";
+          const eduHtml = items
+            .map((e) => {
+              if (typeof e === "string") {
+                return `<div style="margin-bottom: 6px; font-size: 9.5pt; color: #334155;">${e}</div>`;
+              }
+              return `
+                <div style="margin-bottom: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <span style="font-weight: 700; font-size: 10pt; color: #0f172a;">${e.degree || ""}</span>
+                    ${e.period ? `<span style="font-size: 9pt; color: #64748b;">${e.period}</span>` : ""}
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 9pt; color: #334155;">
+                    <span>${e.institution || ""}${e.location ? ` — ${e.location}` : ""}</span>
+                    ${e.details ? `<span style="color: #64748b; font-weight: 500;">${e.details}</span>` : ""}
+                  </div>
+                </div>
+              `;
+            })
+            .join("");
+          return `
+            <div class="section-title">${sec.title}</div>
+            ${eduHtml}
+          `;
+        }
+
+        if (sec.type === "recognition") {
+          const bullets = (sec.bullets || [])
+            .map((a) => `<li style="margin-bottom: 4px; font-size: 9.5pt; color: #1e293b; line-height: 1.4;">${a}</li>`)
+            .join("");
+          if (!bullets) return "";
+          return `
+            <div class="section-title">${sec.title}</div>
+            <ul style="margin: 4px 0 0 18px; padding: 0;">${bullets}</ul>
+          `;
+        }
+
+        // Custom / fallback section
+        if (sec.rawLines && sec.rawLines.length) {
+          const lines = sec.rawLines.map((l) => `<li style="margin-bottom: 4px;">${l}</li>`).join("");
+          return `
+            <div class="section-title">${sec.title}</div>
+            <ul style="margin: 4px 0 6px 18px; padding: 0; font-size: 9.5pt; color: #1e293b;">${lines}</ul>
+          `;
+        }
+        if (sec.rawContent) {
+          return `
+            <div class="section-title">${sec.title}</div>
+            <p style="font-size: 9.5pt; color: #334155; line-height: 1.5;">${sec.rawContent}</p>
+          `;
+        }
+        return "";
       })
       .join("");
-  }
+  } else {
+    // Legacy fallback rendering
+    let skillsHtml = "";
+    if (Array.isArray(skills) && skills.length > 0) {
+      skillsHtml = `<p style="margin: 0; font-size: 10pt; line-height: 1.5; color: #334155;">${skills.join(" • ")}</p>`;
+    } else if (typeof skills === "object" && skills !== null && Object.keys(skills).length > 0) {
+      skillsHtml = Object.entries(skills)
+        .map(([cat, list]) => {
+          const items = Array.isArray(list) ? list.join(", ") : list;
+          return `<div style="margin-bottom: 4px; font-size: 9.5pt;"><strong style="color: #0f172a;">${cat}:</strong> <span style="color: #334155;">${items}</span></div>`;
+        })
+        .join("");
+    }
 
-  let projectsHtml = "";
-  if (projects && projects.length) {
-    projectsHtml = projects
-      .filter(Boolean)
-      .map((p) => {
-        const bullets = (p.bullets || [])
-          .filter(Boolean)
-          .map((b) => {
-            const str = typeof b === "string" ? b : b?.improvedBullet || "";
-            return str ? `<li style="margin-bottom: 4px; line-height: 1.45;">${str}</li>` : "";
-          })
-          .filter(Boolean)
-          .join("");
-        return `
-      <div style="margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline;">
-          <span style="font-weight: 700; font-size: 10.5pt; color: #0f172a;">${p.name || "Project"}${p.role ? ` — <span style="font-weight: 600; color: #475569;">${p.role}</span>` : ""}</span>
+    let projectsHtml = "";
+    if (projects && projects.length) {
+      projectsHtml = projects
+        .filter(Boolean)
+        .map((p) => {
+          const bullets = (p.bullets || [])
+            .filter(Boolean)
+            .map((b) => {
+              const str = typeof b === "string" ? b : b?.improvedBullet || "";
+              return str ? `<li style="margin-bottom: 4px; line-height: 1.45;">${str}</li>` : "";
+            })
+            .filter(Boolean)
+            .join("");
+          return `
+        <div style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <span style="font-weight: 700; font-size: 10.5pt; color: #0f172a;">${p.name || "Project"}${p.role ? ` — <span style="font-weight: 600; color: #475569;">${p.role}</span>` : ""}</span>
+          </div>
+          ${p.techStack ? `<div style="font-size: 9pt; color: #475569; font-style: italic; margin-bottom: 4px;">Tech Stack: ${p.techStack}</div>` : ""}
+          <ul style="margin: 4px 0 6px 18px; padding: 0; font-size: 9.5pt; color: #1e293b;">
+            ${bullets}
+          </ul>
         </div>
-        ${p.techStack ? `<div style="font-size: 9pt; color: #475569; font-style: italic; margin-bottom: 4px;">Tech Stack: ${p.techStack}</div>` : ""}
-        <ul style="margin: 4px 0 6px 18px; padding: 0; font-size: 9.5pt; color: #1e293b;">
-          ${bullets}
-        </ul>
-      </div>
+      `;
+        })
+        .join("");
+    } else if (bulletImprovements && bulletImprovements.length) {
+      const bullets = bulletImprovements
+        .filter(Boolean)
+        .map((b) => {
+          const str = typeof b === "string" ? b : b?.improvedBullet || "";
+          return str ? `<li style="margin-bottom: 4px; line-height: 1.45;">${str}</li>` : "";
+        })
+        .filter(Boolean)
+        .join("");
+      projectsHtml = `<ul style="margin: 4px 0 6px 18px; padding: 0; font-size: 9.5pt; color: #1e293b;">${bullets}</ul>`;
+    }
+
+    const educationHtml = (education || [])
+      .map((e) => {
+        if (typeof e === "string") {
+          return `<div style="margin-bottom: 6px; font-size: 9.5pt; color: #334155;">${e}</div>`;
+        }
+        return `
+          <div style="margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <span style="font-weight: 700; font-size: 10pt; color: #0f172a;">${e.degree || ""}</span>
+              ${(e.period || e.year) ? `<span style="font-size: 9pt; color: #64748b;">${e.period || e.year}</span>` : ""}
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 9pt; color: #334155;">
+              <span>${e.institution || ""}${e.location ? ` — ${e.location}` : ""}</span>
+              ${e.details ? `<span style="color: #64748b; font-weight: 500;">${e.details}</span>` : ""}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    const achievementsHtml = (achievements || [])
+      .map((a) => `<li style="margin-bottom: 4px; font-size: 9.5pt; color: #1e293b; line-height: 1.4;">${a}</li>`)
+      .join("");
+
+    bodyContentHtml = `
+      ${summary ? `
+      <div class="section-title">Professional Summary</div>
+      <p style="font-size: 9.5pt; text-align: justify; color: #334155; line-height: 1.5;">${summary}</p>
+      ` : ""}
+
+      ${skillsHtml ? `
+      <div class="section-title">Technical Skills</div>
+      ${skillsHtml}
+      ` : ""}
+
+      ${projectsHtml ? `
+      <div class="section-title">Projects & Experience</div>
+      ${projectsHtml}
+      ` : ""}
+
+      ${educationHtml ? `
+      <div class="section-title">Education</div>
+      ${educationHtml}
+      ` : ""}
+
+      ${achievementsHtml ? `
+      <div class="section-title">Achievements & Awards</div>
+      <ul style="margin: 4px 0 0 18px; padding: 0;">${achievementsHtml}</ul>
+      ` : ""}
     `;
-      })
-      .join("");
-  } else if (bulletImprovements && bulletImprovements.length) {
-    const bullets = bulletImprovements
-      .filter(Boolean)
-      .map((b) => {
-        const str = typeof b === "string" ? b : b?.improvedBullet || "";
-        return str ? `<li style="margin-bottom: 4px; line-height: 1.45;">${str}</li>` : "";
-      })
-      .filter(Boolean)
-      .join("");
-    projectsHtml = `<ul style="margin: 4px 0 6px 18px; padding: 0; font-size: 9.5pt; color: #1e293b;">${bullets}</ul>`;
   }
-
-  const educationHtml = (education || [])
-    .map(
-      (e) => `
-    <div style="margin-bottom: 8px;">
-      <div style="font-weight: 700; font-size: 10pt; color: #0f172a;">${e.degree || ""}</div>
-      <div style="font-size: 9pt; color: #334155;">${e.institution || ""}${e.details ? ` — <span style="color: #64748b;">${e.details}</span>` : ""}</div>
-    </div>
-  `
-    )
-    .join("");
-
-  const achievementsHtml = (achievements || [])
-    .map((a) => `<li style="margin-bottom: 4px; font-size: 9.5pt; color: #1e293b; line-height: 1.4;">${a}</li>`)
-    .join("");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -136,30 +328,7 @@ export const generateAtsHtml = ({
     ${contactHtml ? `<div class="contact-line">${contactHtml}</div>` : ""}
   </div>
 
-  ${summary ? `
-  <div class="section-title">Professional Summary</div>
-  <p style="font-size: 9.5pt; text-align: justify; color: #334155; line-height: 1.5;">${summary}</p>
-  ` : ""}
-
-  ${skillsHtml ? `
-  <div class="section-title">Technical Skills</div>
-  ${skillsHtml}
-  ` : ""}
-
-  ${projectsHtml ? `
-  <div class="section-title">Projects & Experience</div>
-  ${projectsHtml}
-  ` : ""}
-
-  ${educationHtml ? `
-  <div class="section-title">Education</div>
-  ${educationHtml}
-  ` : ""}
-
-  ${achievementsHtml ? `
-  <div class="section-title">Achievements & Awards</div>
-  <ul style="margin: 4px 0 0 18px; padding: 0;">${achievementsHtml}</ul>
-  ` : ""}
+  ${bodyContentHtml}
 </body>
 </html>`;
 };
@@ -174,6 +343,7 @@ export const generateAtsPlainText = ({
   education = [],
   achievements = [],
   bulletImprovements = [],
+  sections = [],
 }) => {
   const safeName = candidateName || "Candidate";
   const safeRole = targetRole || "Professional";
@@ -185,52 +355,114 @@ export const generateAtsPlainText = ({
   if (contact.github) contactParts.push(contact.github);
   if (contact.location) contactParts.push(contact.location);
 
-  let skillsText = "";
-  if (Array.isArray(skills)) {
-    skillsText = skills.join(", ");
-  } else if (typeof skills === "object" && skills !== null) {
-    skillsText = Object.entries(skills)
-      .map(([cat, list]) => `${cat}: ${Array.isArray(list) ? list.join(", ") : list}`)
-      .join("\n");
-  }
+  let bodyText = "";
 
-  let projectsText = "";
-  if (projects && projects.length) {
-    projectsText = projects
-      .map((p) => {
-        const bText = (p.bullets || []).map((b) => `  * ${b}`).join("\n");
-        return `${p.name}${p.role ? ` (${p.role})` : ""}\nTech Stack: ${p.techStack || ""}\n${bText}`;
+  if (Array.isArray(sections) && sections.length > 0) {
+    bodyText = sections
+      .map((sec) => {
+        if (!sec || !sec.title) return "";
+        let contentStr = "";
+        if (sec.type === "summary") {
+          contentStr = sec.text || sec.rawContent || "";
+        } else if (sec.type === "impact") {
+          contentStr = (sec.bullets || []).map((b) => `* ${b}`).join("\n");
+        } else if (sec.type === "expertise") {
+          contentStr = (sec.items || []).join(", ");
+        } else if (sec.type === "toolkit") {
+          contentStr = Object.entries(sec.categories || {})
+            .map(([cat, list]) => `${cat}: ${Array.isArray(list) ? list.join(", ") : list}`)
+            .join("\n");
+        } else if (sec.type === "skills") {
+          contentStr = Array.isArray(sec.items) ? sec.items.join(", ") : (sec.rawContent || "");
+        } else if (sec.type === "experience") {
+          contentStr = (sec.projects || [])
+            .map((p) => {
+              const bText = (p.bullets || []).map((b) => `  * ${typeof b === "string" ? b : (b?.improvedBullet || "")}`).join("\n");
+              return `${p.name}${p.role ? ` (${p.role})` : ""}${p.period ? ` [${p.period}]` : ""}\n${p.techStack ? `Tech Stack: ${p.techStack}\n` : ""}${bText}`;
+            })
+            .join("\n\n");
+        } else if (sec.type === "education") {
+          contentStr = (sec.items || [])
+            .map((e) => {
+              if (typeof e === "string") return e;
+              let s = e.degree || "";
+              if (e.period) s += ` [${e.period}]`;
+              if (e.institution) s += `\n${e.institution}`;
+              if (e.location) s += ` — ${e.location}`;
+              if (e.details) s += ` (${e.details})`;
+              return s;
+            })
+            .join("\n\n");
+        } else if (sec.type === "recognition") {
+          contentStr = (sec.bullets || []).map((a) => `* ${a}`).join("\n");
+        } else {
+          contentStr = sec.rawLines ? sec.rawLines.map((l) => `* ${l}`).join("\n") : (sec.rawContent || "");
+        }
+        return `${sec.title.toUpperCase()}:\n${contentStr}`;
+      })
+      .filter(Boolean)
+      .join("\n\n");
+  } else {
+    let skillsText = "";
+    if (Array.isArray(skills) && skills.length > 0) {
+      skillsText = skills.join(", ");
+    } else if (typeof skills === "object" && skills !== null && Object.keys(skills).length > 0) {
+      skillsText = Object.entries(skills)
+        .map(([cat, list]) => `${cat}: ${Array.isArray(list) ? list.join(", ") : list}`)
+        .join("\n");
+    }
+
+    let projectsText = "";
+    if (projects && projects.length) {
+      projectsText = projects
+        .map((p) => {
+          const bText = (p.bullets || []).map((b) => `  * ${b}`).join("\n");
+          return `${p.name}${p.role ? ` (${p.role})` : ""}\nTech Stack: ${p.techStack || ""}\n${bText}`;
+        })
+        .join("\n\n");
+    } else if (bulletImprovements && bulletImprovements.length) {
+      projectsText = bulletImprovements.map((b) => `* ${b.improvedBullet || b}`).join("\n");
+    }
+
+    const educationText = (education || [])
+      .map((e) => {
+        if (typeof e === "string") return e;
+        let s = e.degree || "";
+        if (e.period || e.year) s += ` [${e.period || e.year}]`;
+        if (e.institution) s += `\n${e.institution}`;
+        if (e.location) s += ` — ${e.location}`;
+        if (e.details) s += ` (${e.details})`;
+        return s;
       })
       .join("\n\n");
-  } else if (bulletImprovements && bulletImprovements.length) {
-    projectsText = bulletImprovements.map((b) => `* ${b.improvedBullet || b}`).join("\n");
+
+    const achievementsText = (achievements || []).map((a) => `* ${a}`).join("\n");
+
+    const parts = [];
+    if (summary) {
+      parts.push(`PROFESSIONAL SUMMARY:\n${summary}`);
+    }
+    if (skillsText) {
+      parts.push(`TECHNICAL SKILLS:\n${skillsText}`);
+    }
+    if (projectsText) {
+      parts.push(`PROJECTS & EXPERIENCE:\n${projectsText}`);
+    }
+    if (educationText) {
+      parts.push(`EDUCATION:\n${educationText}`);
+    }
+    if (achievementsText) {
+      parts.push(`ACHIEVEMENTS & AWARDS:\n${achievementsText}`);
+    }
+    bodyText = parts.join("\n\n");
   }
-
-  const educationText = (education || [])
-    .map((e) => `${e.degree || ""}\n${e.institution || ""} ${e.details || ""}`)
-    .join("\n\n");
-
-  const achievementsText = (achievements || []).map((a) => `* ${a}`).join("\n");
 
   return `${safeName.toUpperCase()}
 ${safeRole}
 ${contactParts.join(" | ")}
 ============================================================
 
-PROFESSIONAL SUMMARY:
-${summary || "Experienced professional aligned to target competencies."}
-
-TECHNICAL SKILLS:
-${skillsText}
-
-PROJECTS & EXPERIENCE:
-${projectsText}
-
-EDUCATION:
-${educationText}
-
-ACHIEVEMENTS & AWARDS:
-${achievementsText}
+${bodyText}
 ============================================================
 `;
 };
@@ -245,6 +477,7 @@ export const generateAtsPdf = ({
   education = [],
   achievements = [],
   bulletImprovements = [],
+  sections = [],
 }) => {
   return new Promise((resolve, reject) => {
     try {
@@ -297,45 +530,157 @@ export const generateAtsPdf = ({
         doc.moveDown(0.35);
       };
 
-      // Professional Summary
-      if (summary) {
-        renderSectionHeader("Professional Summary");
-        doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(summary, {
-          align: "justify",
-          lineGap: 2,
-        });
-      }
+      if (Array.isArray(sections) && sections.length > 0) {
+        sections.forEach((sec) => {
+          if (!sec || !sec.title) return;
+          renderSectionHeader(sec.title);
 
-      // Technical Skills
-      const hasSkills = skills && (Array.isArray(skills) ? skills.length : Object.keys(skills).length > 0);
-      if (hasSkills) {
-        renderSectionHeader("Technical Skills");
-        if (Array.isArray(skills)) {
-          doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(skills.join("  •  "), { lineGap: 2 });
-        } else if (typeof skills === "object") {
-          Object.entries(skills).forEach(([cat, list]) => {
-            const items = Array.isArray(list) ? list.join(", ") : list;
-            doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#0f172a").text(`${cat}: `, {
-              continued: true,
+          if (sec.type === "summary") {
+            const summaryStr = sec.text || sec.rawContent || "";
+            if (summaryStr) {
+              doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(summaryStr, {
+                align: "justify",
+                lineGap: 2,
+              });
+            }
+          } else if (sec.type === "impact") {
+            (sec.bullets || []).filter(Boolean).forEach((b) => {
+              doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${b}`, {
+                indent: 10,
+                lineGap: 1.5,
+              });
             });
-            doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(items, { lineGap: 2 });
+          } else if (sec.type === "expertise") {
+            const items = (sec.items || []).join("  •  ");
+            if (items) {
+              doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(items, { lineGap: 2 });
+            }
+          } else if (sec.type === "toolkit") {
+            Object.entries(sec.categories || {}).forEach(([cat, list]) => {
+              const items = Array.isArray(list) ? list.join(", ") : list;
+              doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#0f172a").text(`${cat}: `, {
+                continued: true,
+              });
+              doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(items, { lineGap: 2 });
+            });
+          } else if (sec.type === "skills") {
+            const items = Array.isArray(sec.items) ? sec.items.join("  •  ") : (sec.rawContent || "");
+            if (items) {
+              doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(items, { lineGap: 2 });
+            }
+          } else if (sec.type === "experience") {
+            (sec.projects || []).forEach((p) => {
+              doc.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a").text(p.name, { continued: !!p.role });
+              if (p.role) {
+                doc.font("Helvetica").fontSize(9.5).fillColor("#64748b").text(` — ${p.role}`);
+              }
+              if (p.period) {
+                doc.font("Helvetica").fontSize(8.5).fillColor("#64748b").text(` [${p.period}]`);
+              }
+              if (p.techStack) {
+                doc.font("Helvetica-Oblique").fontSize(8.5).fillColor("#475569").text(`Tech Stack: ${p.techStack}`);
+              }
+              doc.moveDown(0.15);
+              (p.bullets || []).filter(Boolean).forEach((b) => {
+                const bulletStr = typeof b === "string" ? b : b?.improvedBullet || "";
+                if (bulletStr && typeof bulletStr === "string") {
+                  doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${bulletStr}`, {
+                    indent: 10,
+                    lineGap: 1.5,
+                  });
+                }
+              });
+              doc.moveDown(0.3);
+            });
+          } else if (sec.type === "education") {
+            (sec.items || []).forEach((e) => {
+              if (typeof e === "string") {
+                doc.font("Helvetica").fontSize(9).fillColor("#334155").text(e);
+              } else {
+                doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#0f172a").text(e.degree || "", {
+                  continued: !!e.period,
+                });
+                if (e.period) {
+                  doc.font("Helvetica").fontSize(8.5).fillColor("#64748b").text(`  [${e.period}]`);
+                }
+                let instText = e.institution || "";
+                if (e.location) instText += ` (${e.location})`;
+                if (e.details) instText += ` — ${e.details}`;
+                if (instText) doc.font("Helvetica").fontSize(9).fillColor("#475569").text(instText);
+              }
+              doc.moveDown(0.2);
+            });
+          } else if (sec.type === "recognition") {
+            (sec.bullets || []).forEach((a) => {
+              doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`★  ${a}`, {
+                indent: 10,
+                lineGap: 1.5,
+              });
+            });
+          } else {
+            if (sec.rawLines) {
+              sec.rawLines.forEach((l) => {
+                doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${l}`, {
+                  indent: 10,
+                  lineGap: 1.5,
+                });
+              });
+            } else if (sec.rawContent) {
+              doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(sec.rawContent, { lineGap: 2 });
+            }
+          }
+        });
+      } else {
+        // Legacy fallback
+        if (summary) {
+          renderSectionHeader("Professional Summary");
+          doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(summary, {
+            align: "justify",
+            lineGap: 2,
           });
         }
-      }
 
-      // Projects & Experience
-      if (projects && projects.length) {
-        renderSectionHeader("Projects & Experience");
-        projects.forEach((p) => {
-          doc.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a").text(p.name, { continued: !!p.role });
-          if (p.role) {
-            doc.font("Helvetica").fontSize(9.5).fillColor("#64748b").text(` — ${p.role}`);
+        const hasSkills = skills && (Array.isArray(skills) ? skills.length : Object.keys(skills).length > 0);
+        if (hasSkills) {
+          renderSectionHeader("Technical Skills");
+          if (Array.isArray(skills)) {
+            doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(skills.join("  •  "), { lineGap: 2 });
+          } else if (typeof skills === "object") {
+            Object.entries(skills).forEach(([cat, list]) => {
+              const items = Array.isArray(list) ? list.join(", ") : list;
+              doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#0f172a").text(`${cat}: `, {
+                continued: true,
+              });
+              doc.font("Helvetica").fontSize(9.5).fillColor("#334155").text(items, { lineGap: 2 });
+            });
           }
-          if (p.techStack) {
-            doc.font("Helvetica-Oblique").fontSize(8.5).fillColor("#475569").text(`Tech Stack: ${p.techStack}`);
-          }
-          doc.moveDown(0.15);
-          (p.bullets || []).filter(Boolean).forEach((b) => {
+        }
+
+        if (projects && projects.length) {
+          renderSectionHeader("Projects & Experience");
+          projects.forEach((p) => {
+            doc.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a").text(p.name, { continued: !!p.role });
+            if (p.role) {
+              doc.font("Helvetica").fontSize(9.5).fillColor("#64748b").text(` — ${p.role}`);
+            }
+            if (p.techStack) {
+              doc.font("Helvetica-Oblique").fontSize(8.5).fillColor("#475569").text(`Tech Stack: ${p.techStack}`);
+            }
+            doc.moveDown(0.15);
+            (p.bullets || []).filter(Boolean).forEach((b) => {
+              const bulletStr = typeof b === "string" ? b : b?.improvedBullet || "";
+              if (bulletStr && typeof bulletStr === "string") {
+                doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${bulletStr}`, {
+                  indent: 10,
+                  lineGap: 1.5,
+                });
+              }
+            });
+            doc.moveDown(0.3);
+          });
+        } else if (bulletImprovements && bulletImprovements.length) {
+          renderSectionHeader("Projects & Experience");
+          bulletImprovements.filter(Boolean).forEach((b) => {
             const bulletStr = typeof b === "string" ? b : b?.improvedBullet || "";
             if (bulletStr && typeof bulletStr === "string") {
               doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${bulletStr}`, {
@@ -344,42 +689,38 @@ export const generateAtsPdf = ({
               });
             }
           });
-          doc.moveDown(0.3);
-        });
-      } else if (bulletImprovements && bulletImprovements.length) {
-        renderSectionHeader("Projects & Experience");
-        bulletImprovements.filter(Boolean).forEach((b) => {
-          const bulletStr = typeof b === "string" ? b : b?.improvedBullet || "";
-          if (bulletStr && typeof bulletStr === "string") {
-            doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`•  ${bulletStr}`, {
+        }
+
+        if (education && education.length) {
+          renderSectionHeader("Education");
+          education.forEach((e) => {
+            if (typeof e === "string") {
+              doc.font("Helvetica").fontSize(9).fillColor("#334155").text(e);
+            } else {
+              doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#0f172a").text(e.degree || "", {
+                continued: !!(e.period || e.year),
+              });
+              if (e.period || e.year) {
+                doc.font("Helvetica").fontSize(8.5).fillColor("#64748b").text(`  [${e.period || e.year}]`);
+              }
+              let instText = e.institution || "";
+              if (e.location) instText += ` (${e.location})`;
+              if (e.details) instText += ` — ${e.details}`;
+              if (instText) doc.font("Helvetica").fontSize(9).fillColor("#475569").text(instText);
+            }
+            doc.moveDown(0.2);
+          });
+        }
+
+        if (achievements && achievements.length) {
+          renderSectionHeader("Achievements & Awards");
+          achievements.forEach((a) => {
+            doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`★  ${a}`, {
               indent: 10,
               lineGap: 1.5,
             });
-          }
-        });
-      }
-
-      // Education
-      if (education && education.length) {
-        renderSectionHeader("Education");
-        education.forEach((e) => {
-          doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#0f172a").text(e.degree || "");
-          let instText = e.institution || "";
-          if (e.details) instText += ` — ${e.details}`;
-          doc.font("Helvetica").fontSize(9).fillColor("#475569").text(instText);
-          doc.moveDown(0.2);
-        });
-      }
-
-      // Achievements
-      if (achievements && achievements.length) {
-        renderSectionHeader("Achievements & Awards");
-        achievements.forEach((a) => {
-          doc.font("Helvetica").fontSize(9).fillColor("#1e293b").text(`★  ${a}`, {
-            indent: 10,
-            lineGap: 1.5,
           });
-        });
+        }
       }
 
       doc.end();

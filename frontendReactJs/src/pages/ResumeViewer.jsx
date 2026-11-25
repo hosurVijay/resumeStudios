@@ -70,6 +70,35 @@ export default function ResumeViewer() {
   const currentScore = Number(appData?.currentScore ?? appData?.latestTailoredVersion?.score ?? initialScore) || 0;
   const scoreGain = Math.max(0, currentScore - initialScore);
 
+  const [showHighlights, setShowHighlights] = useState(true);
+
+  const originalContent = appData?.originalContent || null;
+
+  const originalBulletsSet = useMemo(() => {
+    const set = new Set();
+    if (originalContent?.projects && Array.isArray(originalContent.projects)) {
+      originalContent.projects.forEach((p) => {
+        if (Array.isArray(p?.bullets)) {
+          p.bullets.forEach((b) => {
+            const str = typeof b === "string" ? b.trim() : (b?.improvedBullet || "").trim();
+            if (str) set.add(str);
+          });
+        }
+      });
+    }
+    return set;
+  }, [originalContent]);
+
+  const isSummaryModified = useMemo(() => {
+    if (!isTailored || !resumeContent?.summary) return false;
+    if (resumeContent?.modifiedSections?.summary !== undefined) {
+      return Boolean(resumeContent.modifiedSections.summary);
+    }
+    const orig = (originalContent?.summary || "").trim();
+    const curr = resumeContent.summary.trim();
+    return Boolean(orig && curr && curr !== orig);
+  }, [isTailored, resumeContent?.summary, resumeContent?.modifiedSections, originalContent]);
+
   const handleDownload = async (format) => {
     if (!appData?.latestTailoredVersion?.id) {
       toast.error("Tailored version not found to download. Please open Studio to generate tailored version.");
@@ -195,6 +224,23 @@ export default function ResumeViewer() {
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Highlight Changes Toggle */}
+          {isTailored && (
+            <button
+              type="button"
+              onClick={() => setShowHighlights(!showHighlights)}
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border transition-all cursor-pointer ${
+                showHighlights
+                  ? "bg-emerald-50 dark:bg-emerald-950/60 text-[#0F4C3A] dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 shadow-xs"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              }`}
+              title="Toggle highlighting of tailored additions vs preserved original sections"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#0F4C3A] dark:text-emerald-400" />
+              <span>{showHighlights ? "Highlight Changes: ON" : "Highlight Changes: OFF"}</span>
+            </button>
+          )}
+
           {appData.latestTailoredVersion?.id && (
             <div className="flex items-center gap-1.5">
               <button
@@ -332,176 +378,693 @@ export default function ResumeViewer() {
 
       {/* Tab 1: ATS Resume Preview Document */}
       {activeTab === "resume" && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-10 shadow-sm max-w-4xl mx-auto space-y-6 text-slate-800 dark:text-slate-100">
-          {/* Candidate Header */}
-          <div className="text-center space-y-2 pb-6 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              {resumeContent?.name || "Candidate Name"}
-            </h2>
-
-            {/* Contact details line */}
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
-              {resumeContent?.contact?.email && <span>{resumeContent.contact.email}</span>}
-              {resumeContent?.contact?.phone && (
-                <>
-                  <span>•</span>
-                  <span>{resumeContent.contact.phone}</span>
-                </>
-              )}
-              {resumeContent?.contact?.location && (
-                <>
-                  <span>•</span>
-                  <span>{resumeContent.contact.location}</span>
-                </>
-              )}
-              {resumeContent?.contact?.linkedin && (
-                <>
-                  <span>•</span>
-                  <a
-                    href={resumeContent.contact.linkedin.startsWith("http") ? resumeContent.contact.linkedin : `https://${resumeContent.contact.linkedin}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:underline text-[#0F4C3A] dark:text-emerald-400 font-medium"
-                  >
-                    LinkedIn
-                  </a>
-                </>
-              )}
-              {resumeContent?.contact?.github && (
-                <>
-                  <span>•</span>
-                  <a
-                    href={resumeContent.contact.github.startsWith("http") ? resumeContent.contact.github : `https://${resumeContent.contact.github}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="hover:underline text-[#0F4C3A] dark:text-emerald-400 font-medium"
-                  >
-                    GitHub
-                  </a>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Professional Summary */}
-          {resumeContent?.summary && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 border-b border-emerald-100 dark:border-emerald-950 pb-1">
-                Professional Summary
-              </h3>
-              <p className="text-xs sm:text-sm leading-relaxed text-slate-700 dark:text-slate-200">
-                {resumeContent.summary}
-              </p>
+        <div className="space-y-4 max-w-4xl mx-auto">
+          {/* Highlight Changes Legend / Preservation Banner */}
+          {isTailored && showHighlights && (
+            <div className="p-3.5 rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
+                <Sparkles className="w-4 h-4 text-[#0F4C3A] dark:text-emerald-400 shrink-0" />
+                <span>
+                  <strong className="font-bold">Highlight Changes: ON</strong> — Verified additions (tailored summary & candidate evidence bullets) are highlighted in emerald.
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800">
+                🔒 Technical Skills, Education & Contact 100% Preserved
+              </span>
             </div>
           )}
 
-          {/* Technical Skills */}
-          {formattedSkills && Object.keys(formattedSkills).length > 0 && (
-            <div className="space-y-2.5">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 border-b border-emerald-100 dark:border-emerald-950 pb-1">
-                Technical Skills & Competencies
-              </h3>
-              <div className="space-y-2 text-xs">
-                {Object.entries(formattedSkills).map(([cat, items], idx) => {
-                  const itemsList = Array.isArray(items)
-                    ? items.join(", ")
-                    : typeof items === "string"
-                    ? items
-                    : "";
-                  if (!itemsList) return null;
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-10 shadow-sm space-y-6 text-slate-800 dark:text-slate-100">
+            {/* Candidate Header */}
+            <div className="text-center space-y-2 pb-6 border-b border-slate-200 dark:border-slate-800">
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                {resumeContent?.name || "Candidate Name"}
+              </h2>
+              {(resumeContent?.targetRoleTitle || appData?.targetRole) && (
+                <p className="text-sm font-semibold text-[#0F4C3A] dark:text-emerald-400">
+                  {resumeContent?.targetRoleTitle || appData?.targetRole}
+                </p>
+              )}
 
+              {/* Contact details line */}
+              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
+                {resumeContent?.contact?.email && <span>{resumeContent.contact.email}</span>}
+                {resumeContent?.contact?.phone && (
+                  <>
+                    <span>•</span>
+                    <span>{resumeContent.contact.phone}</span>
+                  </>
+                )}
+                {resumeContent?.contact?.location && (
+                  <>
+                    <span>•</span>
+                    <span>{resumeContent.contact.location}</span>
+                  </>
+                )}
+                {resumeContent?.contact?.linkedin && (
+                  <>
+                    <span>•</span>
+                    <a
+                      href={resumeContent.contact.linkedin.startsWith("http") ? resumeContent.contact.linkedin : `https://${resumeContent.contact.linkedin}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:underline text-[#0F4C3A] dark:text-emerald-400 font-medium"
+                    >
+                      LinkedIn
+                    </a>
+                  </>
+                )}
+                {resumeContent?.contact?.github && (
+                  <>
+                    <span>•</span>
+                    <a
+                      href={resumeContent.contact.github.startsWith("http") ? resumeContent.contact.github : `https://${resumeContent.contact.github}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:underline text-[#0F4C3A] dark:text-emerald-400 font-medium"
+                    >
+                      GitHub
+                    </a>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Authentic Dynamic Sections Rendering */}
+            {Array.isArray(resumeContent?.sections) && resumeContent.sections.length > 0 ? (
+              resumeContent.sections.map((sec, sIdx) => {
+                // 1. Summary Section (e.g. EXECUTIVE SUMMARY / PROFESSIONAL SUMMARY)
+                if (sec.type === "summary") {
+                  const summaryTextVal = sec.text || sec.rawContent || "";
+                  if (!summaryTextVal) return null;
                   return (
-                    <div key={idx} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                      <span className="font-bold text-slate-900 dark:text-white min-w-[140px] shrink-0">
-                        {cat}:
-                      </span>
-                      <span className="text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                        {itemsList}
-                      </span>
+                    <div key={sIdx} className="space-y-2">
+                      <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                          <span>{sec.title}</span>
+                          {isTailored && isSummaryModified && showHighlights && (
+                            <span className="text-[10px] font-bold text-[#0F4C3A] dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                              ✨ Tailored for Role
+                            </span>
+                          )}
+                          {isTailored && !isSummaryModified && showHighlights && (
+                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                              🔒 Original Preserved
+                            </span>
+                          )}
+                        </h3>
+                      </div>
+                      <div
+                        className={
+                          isTailored && isSummaryModified && showHighlights
+                            ? "p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/80 transition-all shadow-2xs"
+                            : ""
+                        }
+                      >
+                        <p className="text-xs sm:text-sm leading-relaxed text-slate-700 dark:text-slate-200 text-justify">
+                          {summaryTextVal}
+                        </p>
+                      </div>
                     </div>
                   );
-                })}
-              </div>
-            </div>
-          )}
+                }
 
-          {/* Experience & Projects */}
-          {Array.isArray(resumeContent?.projects) && resumeContent.projects.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 border-b border-emerald-100 dark:border-emerald-950 pb-1">
-                Professional Experience & Projects
-              </h3>
-              <div className="space-y-4">
-                {resumeContent.projects.map((proj, pIdx) => (
-                  <div key={pIdx} className="space-y-1.5">
-                    <div className="flex flex-wrap items-baseline justify-between gap-1">
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
-                        {proj.name}
-                      </h4>
-                      {proj.role && (
-                        <span className="text-xs font-semibold text-[#0F4C3A] dark:text-emerald-400">
-                          {proj.role}
-                        </span>
-                      )}
-                    </div>
-
-                    {proj.techStack && (
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                        <strong className="text-slate-700 dark:text-slate-300 font-sans">Technologies:</strong>{" "}
-                        {proj.techStack}
+                // 2. Leadership Impact Section
+                if (sec.type === "impact") {
+                  const bullets = sec.bullets || [];
+                  if (!bullets.length) return null;
+                  return (
+                    <div key={sIdx} className="space-y-2">
+                      <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                          <span>{sec.title}</span>
+                          {showHighlights && (
+                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                              🔒 100% Preserved as Uploaded
+                            </span>
+                          )}
+                        </h3>
                       </div>
-                    )}
-
-                    {Array.isArray(proj.bullets) && proj.bullets.length > 0 && (
-                      <ul className="list-disc list-outside pl-4 space-y-1 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                        {proj.bullets.map((b, bIdx) => (
-                          <li key={bIdx}>{b}</li>
+                      <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {bullets.map((b, bIdx) => (
+                          <li key={bIdx} className="flex items-start gap-2 pl-1">
+                            <span className="text-[#0F4C3A] dark:text-emerald-400 font-bold shrink-0">•</span>
+                            <span>{b}</span>
+                          </li>
                         ))}
                       </ul>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Education */}
-          {Array.isArray(resumeContent?.education) && resumeContent.education.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 border-b border-emerald-100 dark:border-emerald-950 pb-1">
-                Education
-              </h3>
-              <div className="space-y-2">
-                {resumeContent.education.map((edu, eIdx) => (
-                  <div key={eIdx} className="flex flex-wrap items-baseline justify-between gap-1 text-xs">
-                    <div>
-                      <span className="font-bold text-slate-900 dark:text-white">
-                        {edu.degree || edu.institution}
-                      </span>
-                      {edu.institution && edu.degree && (
-                        <span className="text-slate-600 dark:text-slate-400"> • {edu.institution}</span>
-                      )}
                     </div>
-                    {edu.year && <span className="text-slate-500 font-medium">{edu.year}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+                  );
+                }
 
-          {/* Achievements */}
-          {Array.isArray(resumeContent?.achievements) && resumeContent.achievements.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 border-b border-emerald-100 dark:border-emerald-950 pb-1">
-                Honors & Certifications
-              </h3>
-              <ul className="list-disc list-outside pl-4 space-y-1 text-xs text-slate-700 dark:text-slate-300">
-                {resumeContent.achievements.map((ach, aIdx) => (
-                  <li key={aIdx}>{ach}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+                // 3. Core Expertise Section
+                if (sec.type === "expertise") {
+                  const items = sec.items || [];
+                  if (!items.length) return null;
+                  return (
+                    <div key={sIdx} className="space-y-2">
+                      <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                          <span>{sec.title}</span>
+                          {isTailored && sec.isEnriched && showHighlights ? (
+                            <span className="text-[10px] font-bold text-[#0F4C3A] dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                              ✨ Enriched with Evidence
+                            </span>
+                          ) : showHighlights ? (
+                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                              🔒 100% Preserved as Uploaded
+                            </span>
+                          ) : null}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 text-xs">
+                        {items.map((item, iIdx) => {
+                          const isAddedSkill = Boolean(
+                            isTailored &&
+                            Array.isArray(sec.enrichedSkills) &&
+                            sec.enrichedSkills.some((es) => es.toLowerCase() === String(item).trim().toLowerCase())
+                          );
+
+                          if (isTailored && isAddedSkill && showHighlights) {
+                            return (
+                              <span
+                                key={iIdx}
+                                className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-950 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-bold flex items-center gap-1 shadow-2xs"
+                              >
+                                <span>{item}</span>
+                                <span className="text-[9px] text-[#0F4C3A] dark:text-emerald-400">✨</span>
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span
+                              key={iIdx}
+                              className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-medium"
+                            >
+                              {item}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // 4. Technical Toolkit Section
+                if (sec.type === "toolkit") {
+                  const cats = sec.categories || {};
+                  if (!Object.keys(cats).length) return null;
+                  return (
+                    <div key={sIdx} className="space-y-2.5">
+                      <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                          <span>{sec.title}</span>
+                          {isTailored && sec.isEnriched && showHighlights ? (
+                            <span className="text-[10px] font-bold text-[#0F4C3A] dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                              ✨ Enriched with Evidence
+                            </span>
+                          ) : showHighlights ? (
+                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                              🔒 100% Preserved as Uploaded
+                            </span>
+                          ) : null}
+                        </h3>
+                      </div>
+                      <div className="space-y-2 text-xs">
+                        {Object.entries(cats).map(([cat, list], cIdx) => {
+                          const items = Array.isArray(list) ? list : String(list).split(/,\s*/);
+                          return (
+                            <div key={cIdx} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
+                              <span className="font-bold text-slate-900 dark:text-white min-w-[140px] shrink-0">
+                                {cat}:
+                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                {items.map((item, itemIdx) => {
+                                  const trimmed = String(item).trim();
+                                  const isAddedSkill = Boolean(
+                                    isTailored &&
+                                    Array.isArray(sec.enrichedSkills) &&
+                                    sec.enrichedSkills.some((es) => es.toLowerCase() === trimmed.toLowerCase())
+                                  );
+
+                                  if (isTailored && isAddedSkill && showHighlights) {
+                                    return (
+                                      <span
+                                        key={itemIdx}
+                                        className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-950 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-bold flex items-center gap-1 shadow-2xs"
+                                      >
+                                        <span>{trimmed}</span>
+                                        <span className="text-[9px] text-[#0F4C3A] dark:text-emerald-400">✨</span>
+                                      </span>
+                                    );
+                                  }
+
+                                  return (
+                                    <span
+                                      key={itemIdx}
+                                      className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                                    >
+                                      {trimmed}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // 5. Experience & Projects Section
+                if (sec.type === "experience") {
+                  const projList = sec.projects || resumeContent.projects || [];
+                  if (!projList.length) return null;
+                  return (
+                    <div key={sIdx} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                          <span>{sec.title}</span>
+                          {isTailored && showHighlights && (
+                            <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                              <ShieldCheck className="w-3 h-3" />
+                              Evidence Verified
+                            </span>
+                          )}
+                        </h3>
+                      </div>
+                      <div className="space-y-4">
+                        {projList.map((proj, pIdx) => (
+                          <div key={pIdx} className="space-y-1.5">
+                            <div className="flex flex-wrap items-baseline justify-between gap-1">
+                              <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                                {proj.name}
+                              </h4>
+                              <div className="flex items-center gap-2">
+                                {proj.role && (
+                                  <span className="text-xs font-semibold text-[#0F4C3A] dark:text-emerald-400">
+                                    {proj.role}
+                                  </span>
+                                )}
+                                {proj.period && (
+                                  <span className="text-xs text-slate-400">
+                                    • {proj.period}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {proj.techStack && (
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                                <strong className="text-slate-700 dark:text-slate-300 font-sans">Technologies:</strong>{" "}
+                                {proj.techStack}
+                              </div>
+                            )}
+
+                            {Array.isArray(proj.bullets) && proj.bullets.length > 0 && (
+                              <ul className="space-y-1.5 text-xs">
+                                {proj.bullets.map((b, bIdx) => {
+                                  const bulletText = typeof b === "string" ? b : (b?.improvedBullet || String(b || ""));
+                                  if (!bulletText) return null;
+
+                                  const isModifiedBullet = Boolean(
+                                    isTailored &&
+                                    (
+                                      (originalBulletsSet.size > 0 && !originalBulletsSet.has(bulletText.trim())) ||
+                                      (Array.isArray(resumeContent?.modifiedBulletTexts) && resumeContent.modifiedBulletTexts.includes(bulletText.trim()))
+                                    )
+                                  );
+
+                                  if (isTailored && isModifiedBullet && showHighlights) {
+                                    return (
+                                      <li
+                                        key={bIdx}
+                                        className="leading-relaxed p-2.5 rounded-lg bg-emerald-50/90 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700/80 text-emerald-950 dark:text-emerald-100 flex items-start gap-2 shadow-2xs transition-all"
+                                      >
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0 text-sm">✨</span>
+                                        <div className="space-y-0.5">
+                                          <span>{bulletText}</span>
+                                          <span className="block text-[9px] font-bold text-[#0F4C3A] dark:text-emerald-300 uppercase tracking-wider bg-emerald-100/90 dark:bg-emerald-900/80 px-1.5 py-0.5 rounded w-fit">
+                                            Tailored from Candidate Evidence
+                                          </span>
+                                        </div>
+                                      </li>
+                                    );
+                                  }
+
+                                  return (
+                                    <li key={bIdx} className="leading-relaxed text-slate-700 dark:text-slate-300 flex items-start gap-2 pl-1">
+                                      <span className="text-[#0F4C3A] dark:text-emerald-400 font-bold shrink-0">•</span>
+                                      <span>{bulletText}</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // 6. Education Section
+                if (sec.type === "education") {
+                  const eduList = sec.items || resumeContent.education || [];
+                  if (!eduList.length) return null;
+                  return (
+                    <div key={sIdx} className="space-y-3">
+                      <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                          <span>{sec.title}</span>
+                          {showHighlights && (
+                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                              🔒 100% Preserved as Uploaded
+                            </span>
+                          )}
+                        </h3>
+                      </div>
+                      <div className="space-y-2.5 text-xs">
+                        {eduList.map((edu, eIdx) => {
+                          if (typeof edu === "string") {
+                            return (
+                              <div key={eIdx} className="text-slate-800 dark:text-slate-200 leading-relaxed">
+                                {edu}
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={eIdx} className="space-y-0.5">
+                              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                                <span className="font-bold text-slate-900 dark:text-white">
+                                  {edu.degree}
+                                </span>
+                                {edu.period && (
+                                  <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 shrink-0">
+                                    {edu.period}
+                                  </span>
+                                )}
+                              </div>
+                              {(edu.institution || edu.location || edu.details) && (
+                                <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 text-[11px] text-slate-600 dark:text-slate-300">
+                                  <span>
+                                    {edu.institution}
+                                    {edu.location ? ` — ${edu.location}` : ""}
+                                  </span>
+                                  {edu.details && (
+                                    <span className="font-medium text-slate-700 dark:text-slate-200 shrink-0">
+                                      {edu.details}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // 7. Recognition / Awards Section
+                if (sec.type === "recognition") {
+                  const bullets = sec.bullets || [];
+                  if (!bullets.length) return null;
+                  return (
+                    <div key={sIdx} className="space-y-2">
+                      <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                          <span>{sec.title}</span>
+                          {showHighlights && (
+                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                              🔒 100% Preserved as Uploaded
+                            </span>
+                          )}
+                        </h3>
+                      </div>
+                      <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+                        {bullets.map((ach, aIdx) => (
+                          <li key={aIdx} className="flex items-start gap-2 pl-1">
+                            <span className="text-[#0F4C3A] dark:text-emerald-400 font-bold shrink-0">•</span>
+                            <span>{ach}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                }
+
+                // 8. Custom Authentic Section
+                return (
+                  <div key={sIdx} className="space-y-2">
+                    <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                        <span>{sec.title}</span>
+                        {showHighlights && (
+                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                            🔒 100% Preserved as Uploaded
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <p className="text-xs sm:text-sm leading-relaxed text-slate-700 dark:text-slate-200 whitespace-pre-wrap">
+                      {sec.rawContent || sec.text || ""}
+                    </p>
+                  </div>
+                );
+              })
+            ) : (
+              /* Fallback for legacy records */
+              <>
+                {/* Professional Summary */}
+                {resumeContent?.summary && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                        <span>Professional Summary</span>
+                        {isTailored && isSummaryModified && showHighlights && (
+                          <span className="text-[10px] font-bold text-[#0F4C3A] dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                            ✨ Tailored for Role
+                          </span>
+                        )}
+                        {isTailored && !isSummaryModified && showHighlights && (
+                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                            🔒 Original Preserved
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <div
+                      className={
+                        isTailored && isSummaryModified && showHighlights
+                          ? "p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/80 transition-all shadow-2xs"
+                          : ""
+                      }
+                    >
+                      <p className="text-xs sm:text-sm leading-relaxed text-slate-700 dark:text-slate-200 text-justify">
+                        {resumeContent.summary}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Technical Skills - ONLY rendered if skills exist */}
+                {formattedSkills && Object.keys(formattedSkills).length > 0 && (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                        <span>Technical Skills & Competencies</span>
+                        {showHighlights && (
+                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                            🔒 100% Preserved as Uploaded
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      {Object.entries(formattedSkills).map(([cat, items], idx) => {
+                        const itemsList = Array.isArray(items)
+                          ? items.join(", ")
+                          : typeof items === "string"
+                          ? items
+                          : "";
+                        if (!itemsList) return null;
+
+                        return (
+                          <div key={idx} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
+                            <span className="font-bold text-slate-900 dark:text-white min-w-[140px] shrink-0">
+                              {cat}:
+                            </span>
+                            <span className="text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
+                              {itemsList}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Experience & Projects */}
+                {Array.isArray(resumeContent?.projects) && resumeContent.projects.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                        <span>Professional Experience & Projects</span>
+                        {isTailored && showHighlights && (
+                          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" />
+                            Evidence Verified
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="space-y-4">
+                      {resumeContent.projects.map((proj, pIdx) => (
+                        <div key={pIdx} className="space-y-1.5">
+                          <div className="flex flex-wrap items-baseline justify-between gap-1">
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                              {proj.name}
+                            </h4>
+                            {proj.role && (
+                              <span className="text-xs font-semibold text-[#0F4C3A] dark:text-emerald-400">
+                                {proj.role}
+                              </span>
+                            )}
+                          </div>
+
+                          {proj.techStack && (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                              <strong className="text-slate-700 dark:text-slate-300 font-sans">Technologies:</strong>{" "}
+                              {proj.techStack}
+                            </div>
+                          )}
+
+                          {Array.isArray(proj.bullets) && proj.bullets.length > 0 && (
+                            <ul className="space-y-1.5 text-xs">
+                              {proj.bullets.map((b, bIdx) => {
+                                const bulletText = typeof b === "string" ? b : (b?.improvedBullet || String(b || ""));
+                                if (!bulletText) return null;
+
+                                const isModifiedBullet = Boolean(
+                                  isTailored &&
+                                  (
+                                    (originalBulletsSet.size > 0 && !originalBulletsSet.has(bulletText.trim())) ||
+                                    (Array.isArray(resumeContent?.modifiedBulletTexts) && resumeContent.modifiedBulletTexts.includes(bulletText.trim()))
+                                  )
+                                );
+
+                                if (isTailored && isModifiedBullet && showHighlights) {
+                                  return (
+                                    <li
+                                      key={bIdx}
+                                      className="leading-relaxed p-2.5 rounded-lg bg-emerald-50/90 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700/80 text-emerald-950 dark:text-emerald-100 flex items-start gap-2 shadow-2xs transition-all"
+                                    >
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0 text-sm">✨</span>
+                                      <div className="space-y-0.5">
+                                        <span>{bulletText}</span>
+                                        <span className="block text-[9px] font-bold text-[#0F4C3A] dark:text-emerald-300 uppercase tracking-wider bg-emerald-100/90 dark:bg-emerald-900/80 px-1.5 py-0.5 rounded w-fit">
+                                          Tailored from Candidate Evidence
+                                        </span>
+                                      </div>
+                                    </li>
+                                  );
+                                }
+
+                                return (
+                                  <li key={bIdx} className="leading-relaxed text-slate-700 dark:text-slate-300 flex items-start gap-2 pl-1">
+                                    <span className="text-[#0F4C3A] dark:text-emerald-400 font-bold shrink-0">•</span>
+                                    <span>{bulletText}</span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Education */}
+                {Array.isArray(resumeContent?.education) && resumeContent.education.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                        <span>Education</span>
+                        {showHighlights && (
+                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                            🔒 100% Preserved as Uploaded
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="space-y-2.5 text-xs">
+                      {resumeContent.education.map((edu, eIdx) => {
+                        if (typeof edu === "string") {
+                          return (
+                            <div key={eIdx} className="text-slate-800 dark:text-slate-200 leading-relaxed">
+                              {edu}
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={eIdx} className="space-y-0.5">
+                            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                              <span className="font-bold text-slate-900 dark:text-white">
+                                {edu.degree}
+                              </span>
+                              {(edu.period || edu.year) && (
+                                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 shrink-0">
+                                  {edu.period || edu.year}
+                                </span>
+                              )}
+                            </div>
+                            {(edu.institution || edu.location || edu.details) && (
+                              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 text-[11px] text-slate-600 dark:text-slate-300">
+                                <span>
+                                  {edu.institution}
+                                  {edu.location ? ` — ${edu.location}` : ""}
+                                </span>
+                                {edu.details && (
+                                  <span className="font-medium text-slate-700 dark:text-slate-200 shrink-0">
+                                    {edu.details}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Achievements */}
+                {Array.isArray(resumeContent?.achievements) && resumeContent.achievements.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between border-b border-emerald-100 dark:border-emerald-950 pb-1">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C3A] dark:text-emerald-400 flex items-center gap-2">
+                        <span>Honors & Certifications</span>
+                        {showHighlights && (
+                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                            🔒 100% Preserved as Uploaded
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <ul className="list-disc list-outside pl-4 space-y-1 text-xs text-slate-700 dark:text-slate-300">
+                      {resumeContent.achievements.map((ach, aIdx) => (
+                        <li key={aIdx}>{ach}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
 

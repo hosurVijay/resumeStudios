@@ -23,7 +23,11 @@ import { findUserById } from "../model/user.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
-import { tailorResumeWithEvidence, parseOriginalResumeSections } from "../services/tailoring.service.js";
+import {
+  tailorResumeWithEvidence,
+  parseOriginalResumeSections,
+  generateSummaryVariant,
+} from "../services/tailoring.service.js";
 import { generateAtsHtml, generateAtsPlainText, generateAtsPdf } from "../services/export.service.js";
 
 const CHART_COLORS = [
@@ -107,12 +111,14 @@ export const uploadAndAnalyzeResume = asyncHandler(async (req, res) => {
   const baseResume = parseOriginalResumeSections(resumeText, req.user?.name);
   const originalContent = {
     name: baseResume.name,
+    targetRoleTitle: baseResume.targetRoleTitle,
     contact: baseResume.contact,
     summary: baseResume.summary,
     skills: baseResume.skills,
     projects: baseResume.projects,
     education: baseResume.education,
     achievements: baseResume.achievements,
+    sections: baseResume.sections,
   };
 
   await createResumeVersion({
@@ -244,12 +250,14 @@ export const getApplicationScoreHistory = asyncHandler(async (req, res) => {
       const baseResume = parseOriginalResumeSections(rawResumeText, req.user?.name);
       originalContent = {
         name: baseResume.name,
+        targetRoleTitle: baseResume.targetRoleTitle,
         contact: baseResume.contact,
         summary: baseResume.summary,
         skills: baseResume.skills,
         projects: baseResume.projects,
         education: baseResume.education,
         achievements: baseResume.achievements,
+        sections: baseResume.sections,
       };
 
       // Always extract fresh, active requirements based on the job description and domain
@@ -344,6 +352,7 @@ export const getEvidenceQnA = asyncHandler(async (req, res) => {
 
 export const generateTailoredResume = asyncHandler(async (req, res) => {
   const { applicationId } = req.params;
+  const { updateSummary = true, customSummary } = req.body || {};
   const userId = req.user.id;
 
   const app = await findJobApplicationById(applicationId, userId);
@@ -394,6 +403,8 @@ export const generateTailoredResume = asyncHandler(async (req, res) => {
     targetRole: app.target_role,
     targetCompany: app.target_company,
     userName: user?.name,
+    updateSummary,
+    customSummary,
   });
 
   const nextVersion = await getNextVersionNumber(applicationId);
@@ -492,6 +503,7 @@ export const exportResumeVersion = asyncHandler(async (req, res) => {
     achievements: tailoredContent.achievements || [],
     bulletImprovements: tailoredContent.bulletImprovements || [],
     rawResumeText: tailoredContent.fullTailoredText || "",
+    sections: tailoredContent.sections || [],
   };
 
   const filename = `${version.target_role.replace(/[^a-zA-Z0-9]/g, "_")}_Resume`;
@@ -514,4 +526,37 @@ export const exportResumeVersion = asyncHandler(async (req, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="${filename}.html"`);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   return res.send(htmlOutput);
+});
+
+export const generateSummaryVariantController = asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  const { tone = "executive", index = 0 } = req.body || {};
+  const userId = req.user.id;
+
+  const app = await findJobApplicationById(applicationId, userId);
+  if (!app) {
+    throw new ApiError(404, "Job application not found.");
+  }
+
+  const parsedContent = typeof app.parsed_content === "string"
+    ? JSON.parse(app.parsed_content)
+    : app.parsed_content || {};
+  const rawResumeText = parsedContent.rawText || "";
+
+  const summary = await generateSummaryVariant({
+    rawResumeText,
+    targetRole: app.target_role,
+    targetCompany: app.target_company,
+    jobDescription: app.job_description,
+    tone,
+    index,
+  });
+
+  return res.status(200).json(
+    new ApiResponse(200, "Summary variant generated successfully", {
+      summary,
+      tone,
+      index,
+    })
+  );
 });

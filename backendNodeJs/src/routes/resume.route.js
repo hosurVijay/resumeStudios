@@ -8,6 +8,7 @@ import {
   submitEvidenceQnA,
   getEvidenceQnA,
   generateTailoredResume,
+  generateSummaryVariantController,
   approveVersion,
   exportResumeVersion,
 } from "../controller/resume.controller.js";
@@ -41,6 +42,9 @@ router
   .post(submitEvidenceQnA);
 
 router.route("/applications/:applicationId/tailor").post(generateTailoredResume);
+router
+  .route("/applications/:applicationId/generate-summary")
+  .post(generateSummaryVariantController);
 router
   .route("/applications/:applicationId/versions/:versionId/approve")
   .post(approveVersion);

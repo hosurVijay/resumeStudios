@@ -77,6 +77,7 @@ function ResumeCard({
   highlightTerms = [],
   showHighlights = true,
   candidateName = "Candidate",
+  originalContent = null,
 }) {
   const displayName =
     content.name && !/^candidate$/i.test(content.name)
@@ -90,6 +91,31 @@ function ResumeCard({
   const projects = content.projects || [];
   const education = content.education || [];
   const achievements = content.achievements || [];
+
+  const originalBulletsSet = useMemo(() => {
+    const set = new Set();
+    if (originalContent?.projects && Array.isArray(originalContent.projects)) {
+      originalContent.projects.forEach((p) => {
+        if (Array.isArray(p?.bullets)) {
+          p.bullets.forEach((b) => {
+            const str = typeof b === "string" ? b.trim() : (b?.improvedBullet || "").trim();
+            if (str) set.add(str);
+          });
+        }
+      });
+    }
+    return set;
+  }, [originalContent]);
+
+  const isSummaryModified = useMemo(() => {
+    if (!isTailored || !content.summary) return false;
+    if (content?.modifiedSections?.summary !== undefined) {
+      return Boolean(content.modifiedSections.summary);
+    }
+    const orig = (originalContent?.summary || "").trim();
+    const curr = content.summary.trim();
+    return Boolean(orig && curr && curr !== orig);
+  }, [isTailored, content.summary, content?.modifiedSections, originalContent]);
 
   return (
     <div
@@ -140,7 +166,7 @@ function ResumeCard({
             {displayName}
           </h2>
           <p className="text-xs font-semibold text-[#0F4C3A] dark:text-emerald-400 mt-0.5">
-            {targetRole}
+            {content.targetRoleTitle || targetRole}
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-2.5 text-[11px] text-slate-600 dark:text-slate-400 mt-2">
@@ -177,188 +203,636 @@ function ResumeCard({
           </div>
         </div>
 
-        {summary && (
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Professional Summary
-              </h3>
-              {isTailored && (
-                <span className="text-[10px] font-semibold text-[#0F4C3A] dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-900">
-                  Role-Aligned
-                </span>
-              )}
-            </div>
-            <p className="text-xs leading-relaxed text-slate-800 dark:text-slate-200 text-justify">
-              {isTailored ? highlightText(summary, highlightTerms, showHighlights) : summary}
-            </p>
-          </div>
-        )}
-
-        {/* Technical Skills */}
-        <div>
-          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Technical Skills
-            </h3>
-            {isTailored && (
-              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-900">
-                Categorized & Prioritized
-              </span>
-            )}
-          </div>
-
-          {Array.isArray(rawSkills) ? (
-            <div className="flex flex-wrap gap-1">
-              {rawSkills.map((s, idx) => {
-                const isMatched = highlightTerms.some((t) => t.toLowerCase() === String(s).toLowerCase());
-                return (
-                  <span
-                    key={idx}
-                    className={`text-[11px] px-2 py-0.5 rounded-md ${
-                      isTailored && isMatched && showHighlights
-                        ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-semibold"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
-                    }`}
-                  >
-                    {s}
-                  </span>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-1.5 text-xs text-slate-800 dark:text-slate-200">
-              {Object.entries(rawSkills).map(([cat, list], idx) => {
-                const items = Array.isArray(list) ? list : String(list).split(/,\s*/);
-                return (
-                  <div key={idx} className="flex flex-col sm:flex-row sm:items-baseline gap-1 text-[11px]">
-                    <span className="font-bold text-slate-900 dark:text-white min-w-[150px] shrink-0">
-                      {cat}:
-                    </span>
-                    <div className="flex flex-wrap gap-1 items-center">
-                      {items.map((item, itemIdx) => {
-                        const trimmed = String(item).trim();
-                        const isMatched = highlightTerms.some(
-                          (t) => t.toLowerCase() === trimmed.toLowerCase()
-                        );
-                        return (
-                          <span
-                            key={itemIdx}
-                            className={`px-1.5 py-0.5 rounded-md ${
-                              isTailored && isMatched && showHighlights
-                                ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-semibold"
-                                : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
-                            }`}
-                          >
-                            {trimmed}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Projects */}
-        {projects.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2.5">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <FolderGit2 className="w-3 h-3" />
-                Projects & Experience
-              </h3>
-              {isTailored && (
-                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-                  <ShieldCheck className="w-3 h-3" />
-                  Evidence Verified
-                </span>
-              )}
-            </div>
-            <div className="space-y-3.5">
-              {projects.filter(Boolean).map((proj, pIdx) => (
-                <div key={pIdx} className="space-y-1">
-                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      {proj?.name || "Project"}
-                      {proj?.role && (
-                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 ml-1">
-                          — {proj.role}
+        {/* Authentic Dynamic Sections Rendering */}
+        {Array.isArray(content.sections) && content.sections.length > 0 ? (
+          content.sections.map((sec, sIdx) => {
+            // 1. Summary Section (e.g. EXECUTIVE SUMMARY / PROFESSIONAL SUMMARY)
+            if (sec.type === "summary") {
+              const summaryTextVal = sec.text || sec.rawContent || "";
+              if (!summaryTextVal) return null;
+              return (
+                <div key={sIdx}>
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      {sec.title}
+                      {isTailored && isSummaryModified && showHighlights && (
+                        <span className="text-[9px] font-bold text-[#0F4C3A] dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                          ✨ Tailored for Role
                         </span>
                       )}
-                    </span>
+                      {isTailored && !isSummaryModified && showHighlights && (
+                        <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                          🔒 Original Preserved
+                        </span>
+                      )}
+                    </h3>
                   </div>
-                  {proj?.techStack && (
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
-                      Tech Stack: {isTailored ? highlightText(proj.techStack, highlightTerms, showHighlights) : proj.techStack}
+                  <div
+                    className={
+                      isTailored && isSummaryModified && showHighlights
+                        ? "p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/80 transition-all shadow-2xs"
+                        : ""
+                    }
+                  >
+                    <p className="text-xs leading-relaxed text-slate-800 dark:text-slate-200 text-justify">
+                      {isTailored ? highlightText(summaryTextVal, highlightTerms, showHighlights) : summaryTextVal}
                     </p>
-                  )}
-                  <ul className="space-y-1 pl-2">
-                    {(proj?.bullets || [])
-                      .filter(Boolean)
-                      .map((b, bIdx) => {
-                        const bulletText = typeof b === "string" ? b : (b?.improvedBullet || String(b || ""));
-                        if (!bulletText) return null;
-                        return (
-                          <li
-                            key={bIdx}
-                            className="text-[11px] leading-relaxed text-slate-800 dark:text-slate-200 flex items-start gap-1.5"
-                          >
-                            <span className="text-[#0F4C3A] dark:text-emerald-400 font-bold shrink-0">•</span>
-                            <span>{isTailored ? highlightText(bulletText, highlightTerms, showHighlights) : bulletText}</span>
-                          </li>
-                        );
-                      })}
+                  </div>
+                </div>
+              );
+            }
+
+            // 2. Impact / Leadership Highlights Section
+            if (sec.type === "impact") {
+              const bullets = sec.bullets || [];
+              if (!bullets.length) return null;
+              return (
+                <div key={sIdx}>
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      {sec.title}
+                      {showHighlights && (
+                        <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                          🔒 100% Preserved as Uploaded
+                        </span>
+                      )}
+                    </h3>
+                  </div>
+                  <ul className="space-y-1.5 pl-1">
+                    {bullets.map((b, bIdx) => (
+                      <li key={bIdx} className="text-[11px] leading-relaxed text-slate-800 dark:text-slate-200 flex items-start gap-1.5">
+                        <span className="text-[#0F4C3A] dark:text-emerald-400 font-bold shrink-0">•</span>
+                        <span>{isTailored ? highlightText(b, highlightTerms, showHighlights) : b}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              );
+            }
 
-        {/* Education */}
-        {education.length > 0 && (
-          <div>
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2 flex items-center gap-1">
-              <GraduationCap className="w-3 h-3" />
-              Education (100% Preserved)
-            </h3>
-            <div className="space-y-2">
-              {education.map((edu, idx) => (
-                <div key={idx} className="text-[11px]">
-                  <p className="font-bold text-slate-900 dark:text-white">
-                    {edu.degree}
-                  </p>
-                  <p className="text-slate-600 dark:text-slate-300">
-                    {edu.institution} {edu.details && `— ${edu.details}`}
+            // 3. Core Expertise / Competencies Section
+            if (sec.type === "expertise") {
+              const items = sec.items || [];
+              if (!items.length) return null;
+              return (
+                <div key={sIdx}>
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      {sec.title}
+                      {isTailored && sec.isEnriched && showHighlights ? (
+                        <span className="text-[9px] font-bold text-[#0F4C3A] dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                          ✨ Enriched with Evidence
+                        </span>
+                      ) : showHighlights ? (
+                        <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                          🔒 100% Preserved as Uploaded
+                        </span>
+                      ) : null}
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {items.map((item, iIdx) => {
+                      const isAddedSkill = Boolean(
+                        isTailored &&
+                        Array.isArray(sec.enrichedSkills) &&
+                        sec.enrichedSkills.some((es) => es.toLowerCase() === String(item).trim().toLowerCase())
+                      );
+
+                      if (isTailored && isAddedSkill && showHighlights) {
+                        return (
+                          <span
+                            key={iIdx}
+                            className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-950 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-bold flex items-center gap-1 shadow-2xs"
+                          >
+                            <span>{highlightText(item, highlightTerms, showHighlights)}</span>
+                            <span className="text-[9px] text-[#0F4C3A] dark:text-emerald-400">✨</span>
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <span
+                          key={iIdx}
+                          className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                        >
+                          {isTailored ? highlightText(item, highlightTerms, showHighlights) : item}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
+            // 4. Technical Toolkit / Technologies Section
+            if (sec.type === "toolkit") {
+              const cats = sec.categories || {};
+              if (!Object.keys(cats).length) return null;
+              return (
+                <div key={sIdx}>
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      {sec.title}
+                      {isTailored && sec.isEnriched && showHighlights ? (
+                        <span className="text-[9px] font-bold text-[#0F4C3A] dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                          ✨ Enriched with Evidence
+                        </span>
+                      ) : showHighlights ? (
+                        <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                          🔒 100% Preserved as Uploaded
+                        </span>
+                      ) : null}
+                    </h3>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-slate-800 dark:text-slate-200">
+                    {Object.entries(cats).map(([cat, list], cIdx) => {
+                      const items = Array.isArray(list) ? list : String(list).split(/,\s*/);
+                      return (
+                        <div key={cIdx} className="flex flex-col sm:flex-row sm:items-baseline gap-1 text-[11px]">
+                          <span className="font-bold text-slate-900 dark:text-white min-w-[150px] shrink-0">
+                            {cat}:
+                          </span>
+                          <div className="flex flex-wrap gap-1 items-center">
+                            {items.map((item, itemIdx) => {
+                              const trimmed = String(item).trim();
+                              const isAddedSkill = Boolean(
+                                isTailored &&
+                                Array.isArray(sec.enrichedSkills) &&
+                                sec.enrichedSkills.some((es) => es.toLowerCase() === trimmed.toLowerCase())
+                              );
+
+                              if (isTailored && isAddedSkill && showHighlights) {
+                                return (
+                                  <span
+                                    key={itemIdx}
+                                    className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-950 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-bold flex items-center gap-1 shadow-2xs"
+                                  >
+                                    <span>{highlightText(trimmed, highlightTerms, showHighlights)}</span>
+                                    <span className="text-[9px] text-[#0F4C3A] dark:text-emerald-400">✨</span>
+                                  </span>
+                                );
+                              }
+
+                              return (
+                                <span
+                                  key={itemIdx}
+                                  className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                                >
+                                  {trimmed}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
+            // 5. Experience & Projects Section
+            if (sec.type === "experience") {
+              const projList = sec.projects || content.projects || [];
+              if (!projList.length) return null;
+              return (
+                <div key={sIdx}>
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2.5">
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <FolderGit2 className="w-3 h-3" />
+                      {sec.title}
+                    </h3>
+                    {isTailored && (
+                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                        <ShieldCheck className="w-3 h-3" />
+                        Evidence Verified
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-3.5">
+                    {projList.filter(Boolean).map((proj, pIdx) => (
+                      <div key={pIdx} className="space-y-1">
+                        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">
+                            {proj?.name || "Project"}
+                            {proj?.role && (
+                              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 ml-1">
+                                — {proj.role}
+                              </span>
+                            )}
+                          </span>
+                          {proj?.period && (
+                            <span className="text-[10px] font-medium text-slate-400">
+                              {proj.period}
+                            </span>
+                          )}
+                        </div>
+                        {proj?.techStack && (
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
+                            Tech Stack: {isTailored ? highlightText(proj.techStack, highlightTerms, showHighlights) : proj.techStack}
+                          </p>
+                        )}
+                        <ul className="space-y-1.5 pl-1">
+                          {(proj?.bullets || []).filter(Boolean).map((b, bIdx) => {
+                            const bulletText = typeof b === "string" ? b : (b?.improvedBullet || String(b || ""));
+                            if (!bulletText) return null;
+
+                            const isModifiedBullet = Boolean(
+                              isTailored &&
+                              (
+                                (originalBulletsSet.size > 0 && !originalBulletsSet.has(bulletText.trim())) ||
+                                (Array.isArray(content?.modifiedBulletTexts) && content.modifiedBulletTexts.includes(bulletText.trim()))
+                              )
+                            );
+
+                            if (isTailored && isModifiedBullet && showHighlights) {
+                              return (
+                                <li
+                                  key={bIdx}
+                                  className="text-[11px] leading-relaxed p-2 rounded-lg bg-emerald-50/90 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700/80 text-emerald-950 dark:text-emerald-100 flex items-start gap-2 shadow-2xs transition-all"
+                                >
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0 text-xs">✨</span>
+                                  <div className="space-y-0.5">
+                                    <span>{highlightText(bulletText, highlightTerms, showHighlights)}</span>
+                                    <span className="block text-[9px] font-bold text-[#0F4C3A] dark:text-emerald-300 uppercase tracking-wider bg-emerald-100/90 dark:bg-emerald-900/80 px-1.5 py-0.5 rounded w-fit">
+                                      Tailored from Candidate Evidence
+                                    </span>
+                                  </div>
+                                </li>
+                              );
+                            }
+
+                            return (
+                              <li
+                                key={bIdx}
+                                className="text-[11px] leading-relaxed text-slate-800 dark:text-slate-200 flex items-start gap-1.5"
+                              >
+                                <span className="text-[#0F4C3A] dark:text-emerald-400 font-bold shrink-0">•</span>
+                                <span>{isTailored ? highlightText(bulletText, highlightTerms, showHighlights) : bulletText}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            // 6. Education Section
+            if (sec.type === "education") {
+              const eduItems = sec.items || content.education || [];
+              if (!eduItems.length) return null;
+              return (
+                <div key={sIdx}>
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <GraduationCap className="w-3 h-3" />
+                      {sec.title}
+                    </span>
+                    {showHighlights && (
+                      <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                        🔒 100% Preserved as Uploaded
+                      </span>
+                    )}
+                  </h3>
+                  <div className="space-y-2 text-[11px]">
+                    {eduItems.map((edu, idx) => {
+                      if (typeof edu === "string") {
+                        return (
+                          <p key={idx} className="leading-relaxed text-slate-800 dark:text-slate-200">
+                            {edu}
+                          </p>
+                        );
+                      }
+                      return (
+                        <div key={idx} className="space-y-0.5">
+                          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {edu.degree}
+                            </span>
+                            {edu.period && (
+                              <span className="text-[10px] sm:text-[11px] font-medium text-slate-400 shrink-0">
+                                {edu.period}
+                              </span>
+                            )}
+                          </div>
+                          {(edu.institution || edu.location || edu.details) && (
+                            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 text-[11px] text-slate-600 dark:text-slate-300">
+                              <span>
+                                {edu.institution}
+                                {edu.location ? ` — ${edu.location}` : ""}
+                              </span>
+                              {edu.details && (
+                                <span className="font-medium text-slate-700 dark:text-slate-200 shrink-0">
+                                  {edu.details}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
+            // 7. Recognition / Awards Section
+            if (sec.type === "recognition") {
+              const bullets = sec.bullets || [];
+              if (!bullets.length) return null;
+              return (
+                <div key={sIdx}>
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <Award className="w-3 h-3" />
+                      {sec.title}
+                    </span>
+                    {showHighlights && (
+                      <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                        🔒 100% Preserved as Uploaded
+                      </span>
+                    )}
+                  </h3>
+                  <ul className="space-y-1 pl-1">
+                    {bullets.map((ach, idx) => (
+                      <li
+                        key={idx}
+                        className="text-[11px] text-slate-800 dark:text-slate-200 flex items-start gap-1.5 leading-relaxed"
+                      >
+                        <span className="text-amber-500 font-bold shrink-0">★</span>
+                        <span>{isTailored ? highlightText(ach, highlightTerms, showHighlights) : ach}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            }
+
+            // 8. Custom Authentic Section
+            return (
+              <div key={sIdx}>
+                <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2 flex items-center justify-between">
+                  <span>{sec.title}</span>
+                  {showHighlights && (
+                    <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                      🔒 100% Preserved as Uploaded
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
+                  {sec.rawContent || sec.text || ""}
+                </p>
+              </div>
+            );
+          })
+        ) : (
+          /* Fallback for legacy data without sections list */
+          <>
+            {summary && (
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    Professional Summary
+                    {isTailored && isSummaryModified && showHighlights && (
+                      <span className="text-[9px] font-bold text-[#0F4C3A] dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                        ✨ Tailored for Role
+                      </span>
+                    )}
+                    {isTailored && !isSummaryModified && showHighlights && (
+                      <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                        🔒 Original Preserved
+                      </span>
+                    )}
+                  </h3>
+                </div>
+                <div
+                  className={
+                    isTailored && isSummaryModified && showHighlights
+                      ? "p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/80 transition-all shadow-2xs"
+                      : ""
+                  }
+                >
+                  <p className="text-xs leading-relaxed text-slate-800 dark:text-slate-200 text-justify">
+                    {isTailored ? highlightText(summary, highlightTerms, showHighlights) : summary}
                   </p>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* Achievements */}
-        {achievements.length > 0 && (
-          <div>
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2 flex items-center gap-1">
-              <Award className="w-3 h-3" />
-              Achievements & Awards (100% Preserved)
-            </h3>
-            <ul className="space-y-1 pl-2">
-              {achievements.map((ach, idx) => (
-                <li
-                  key={idx}
-                  className="text-[11px] text-slate-800 dark:text-slate-200 flex items-start gap-1.5 leading-relaxed"
-                >
-                  <span className="text-amber-500 font-bold shrink-0">★</span>
-                  <span>{isTailored ? highlightText(ach, highlightTerms, showHighlights) : ach}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+            {/* Technical Skills - ONLY rendered if skills exist */}
+            {rawSkills && typeof rawSkills === "object" && Object.keys(rawSkills).length > 0 && (
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    Technical Skills
+                    <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                      🔒 100% Preserved as Uploaded
+                    </span>
+                  </h3>
+                </div>
+
+                {Array.isArray(rawSkills) ? (
+                  <div className="flex flex-wrap gap-1">
+                    {rawSkills.map((s, idx) => {
+                      const isMatched = highlightTerms.some((t) => t.toLowerCase() === String(s).toLowerCase());
+                      return (
+                        <span
+                          key={idx}
+                          className={`text-[11px] px-2 py-0.5 rounded-md ${
+                            isTailored && isMatched && showHighlights
+                              ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-semibold"
+                              : "bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                          }`}
+                        >
+                          {s}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 text-xs text-slate-800 dark:text-slate-200">
+                    {Object.entries(rawSkills).map(([cat, list], idx) => {
+                      const items = Array.isArray(list) ? list : String(list).split(/,\s*/);
+                      return (
+                        <div key={idx} className="flex flex-col sm:flex-row sm:items-baseline gap-1 text-[11px]">
+                          <span className="font-bold text-slate-900 dark:text-white min-w-[150px] shrink-0">
+                            {cat}:
+                          </span>
+                          <div className="flex flex-wrap gap-1 items-center">
+                            {items.map((item, itemIdx) => {
+                              const trimmed = String(item).trim();
+                              return (
+                                <span
+                                  key={itemIdx}
+                                  className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+                                >
+                                  {trimmed}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Projects */}
+            {projects.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 mb-2.5">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <FolderGit2 className="w-3 h-3" />
+                    Projects & Experience
+                  </h3>
+                  {isTailored && (
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                      <ShieldCheck className="w-3 h-3" />
+                      Evidence Verified
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-3.5">
+                  {projects.filter(Boolean).map((proj, pIdx) => (
+                    <div key={pIdx} className="space-y-1">
+                      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">
+                          {proj?.name || "Project"}
+                          {proj?.role && (
+                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 ml-1">
+                              — {proj.role}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      {proj?.techStack && (
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
+                          Tech Stack: {isTailored ? highlightText(proj.techStack, highlightTerms, showHighlights) : proj.techStack}
+                        </p>
+                      )}
+                      <ul className="space-y-1.5 pl-1">
+                        {(proj?.bullets || [])
+                          .filter(Boolean)
+                          .map((b, bIdx) => {
+                            const bulletText = typeof b === "string" ? b : (b?.improvedBullet || String(b || ""));
+                            if (!bulletText) return null;
+
+                            const isModifiedBullet = Boolean(
+                              isTailored &&
+                              (
+                                (originalBulletsSet.size > 0 && !originalBulletsSet.has(bulletText.trim())) ||
+                                (Array.isArray(content?.modifiedBulletTexts) && content.modifiedBulletTexts.includes(bulletText.trim()))
+                              )
+                            );
+
+                            if (isTailored && isModifiedBullet && showHighlights) {
+                              return (
+                                <li
+                                  key={bIdx}
+                                  className="text-[11px] leading-relaxed p-2 rounded-lg bg-emerald-50/90 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700/80 text-emerald-950 dark:text-emerald-100 flex items-start gap-2 shadow-2xs transition-all"
+                                >
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold shrink-0 text-xs">✨</span>
+                                  <div className="space-y-0.5">
+                                    <span>{highlightText(bulletText, highlightTerms, showHighlights)}</span>
+                                    <span className="block text-[9px] font-bold text-[#0F4C3A] dark:text-emerald-300 uppercase tracking-wider bg-emerald-100/90 dark:bg-emerald-900/80 px-1.5 py-0.5 rounded w-fit">
+                                      Tailored from Candidate Evidence
+                                    </span>
+                                  </div>
+                                </li>
+                              );
+                            }
+
+                            return (
+                              <li
+                                key={bIdx}
+                                className="text-[11px] leading-relaxed text-slate-800 dark:text-slate-200 flex items-start gap-1.5"
+                              >
+                                <span className="text-[#0F4C3A] dark:text-emerald-400 font-bold shrink-0">•</span>
+                                <span>{isTailored ? highlightText(bulletText, highlightTerms, showHighlights) : bulletText}</span>
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Education */}
+            {education.length > 0 && (
+              <div>
+                <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2 flex items-center gap-1">
+                  <GraduationCap className="w-3 h-3" />
+                  Education (100% Preserved)
+                </h3>
+                <div className="space-y-2 text-[11px]">
+                  {education.map((edu, idx) => {
+                    if (typeof edu === "string") {
+                      return (
+                        <p key={idx} className="leading-relaxed text-slate-800 dark:text-slate-200">
+                          {edu}
+                        </p>
+                      );
+                    }
+                    return (
+                      <div key={idx} className="space-y-0.5">
+                        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            {edu.degree}
+                          </span>
+                          {edu.period && (
+                            <span className="text-[10px] sm:text-[11px] font-medium text-slate-400 shrink-0">
+                              {edu.period}
+                            </span>
+                          )}
+                        </div>
+                        {(edu.institution || edu.location || edu.details) && (
+                          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 text-[11px] text-slate-600 dark:text-slate-300">
+                            <span>
+                              {edu.institution}
+                              {edu.location ? ` — ${edu.location}` : ""}
+                            </span>
+                            {edu.details && (
+                              <span className="font-medium text-slate-700 dark:text-slate-200 shrink-0">
+                                {edu.details}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Achievements */}
+            {achievements.length > 0 && (
+              <div>
+                <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-1 mb-2 flex items-center gap-1">
+                  <Award className="w-3 h-3" />
+                  Achievements & Awards (100% Preserved)
+                </h3>
+                <ul className="space-y-1 pl-2">
+                  {achievements.map((ach, idx) => (
+                    <li
+                      key={idx}
+                      className="text-[11px] text-slate-800 dark:text-slate-200 flex items-start gap-1.5 leading-relaxed"
+                    >
+                      <span className="text-amber-500 font-bold shrink-0">★</span>
+                      <span>{isTailored ? highlightText(ach, highlightTerms, showHighlights) : ach}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -380,8 +854,13 @@ export default function ResumePreview({
   highlightTerms = [],
   onClose,
   downloadingFormat = null,
+  isTruthConfirmed,
+  onTruthConfirmedChange,
 }) {
-  const [confirmed, setConfirmed] = useState(isApproved);
+  const [localConfirmed, setLocalConfirmed] = useState(isApproved);
+  const confirmed = isTruthConfirmed !== undefined ? isTruthConfirmed : localConfirmed;
+  const setConfirmed = onTruthConfirmedChange || setLocalConfirmed;
+
   const [showHighlights, setShowHighlights] = useState(true);
   const [viewMode, setViewMode] = useState("split"); // "split" | "tailored" | "original"
 
@@ -392,11 +871,12 @@ export default function ResumePreview({
     return {
       name: tailoredContent.name || candidateName,
       contact: tailoredContent.contact || {},
-      summary: "Engineering student focused on practical system development, full-stack architectures, and hands-on ML workflows.",
+      summary: tailoredContent.summary || "",
       skills: tailoredContent.skills || {},
       projects: tailoredContent.projects || [],
       education: tailoredContent.education || [],
       achievements: tailoredContent.achievements || [],
+      sections: tailoredContent.sections || [],
     };
   }, [originalContent, tailoredContent, candidateName]);
 
@@ -528,6 +1008,23 @@ export default function ResumePreview({
 
       {/* Main Comparison Area */}
       <div className="p-4 sm:p-6 bg-slate-100/60 dark:bg-slate-950/40">
+        {/* Highlight Changes Legend / Preservation Banner */}
+        {showHighlights && (
+          <div className="mb-4 p-3 rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
+              <Sparkles className="w-4 h-4 text-[#0F4C3A] dark:text-emerald-400 shrink-0" />
+              <span>
+                <strong className="font-bold">Highlight Changes: ON</strong> — Verified additions (tailored summary & candidate evidence bullets) are highlighted in emerald.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-800">
+                🔒 Technical Skills, Education & Contact 100% Preserved
+              </span>
+            </div>
+          </div>
+        )}
+
         {viewMode === "split" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {/* 1. Original Resume Sheet */}
@@ -554,6 +1051,7 @@ export default function ResumePreview({
                 score={updatedScore}
                 scoreLabel="ATS Boosted Match"
                 content={tailoredContent}
+                originalContent={fallbackOriginal}
                 isTailored={true}
                 targetRole={targetRole}
                 highlightTerms={highlightTerms}
@@ -573,6 +1071,7 @@ export default function ResumePreview({
               score={updatedScore}
               scoreLabel="ATS Boosted Match"
               content={tailoredContent}
+              originalContent={fallbackOriginal}
               isTailored={true}
               targetRole={targetRole}
               highlightTerms={highlightTerms}

@@ -69,7 +69,7 @@ export class TermRule extends Rule {
 
     // Depth & Project Verification Check:
     // Distinguish between mere keyword mentions in a skills/tools list vs actual project or work execution.
-    const ACTION_VERB_REGEX = /\b(?:developed|built|designed|implemented|architected|trained|fine[- ]tuned|deployed|optimized|engineered|benchmarked|created|spearheaded|orchestrated|automated|configured|integrated|maintained|scaled|profiled|evaluated|led|analyzed|migrated|refactored|leveraged|resolved|modeled)\b/i;
+    const ACTION_VERB_REGEX = /\b(?:developed|built|designed|implemented|architected|trained|fine[- ]tuned|deployed|optimized|engineered|benchmarked|created|spearheaded|orchestrated|automated|configured|integrated|maintained|scaled|profiled|evaluated|led|analyzed|migrated|refactored|leveraged|resolved|modeled|managed|directed|owned|delivered|handled|executed|facilitated|collaborated|pioneered|launched|drove|coordinated|conducted|supervised|defined|established|shipped|streamlined)\b/i;
 
     const isListingLine = (line) => {
       const trimmed = line.trim();

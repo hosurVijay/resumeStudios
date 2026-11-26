@@ -1,7 +1,9 @@
-import { db } from "../db/index.js";
+import { db, beginTransaction, commitTransaction, rollBackTransaction } from "../db/index.js";
 
 const createUser = async (name, email, password, phoneNumber) => {
   try {
+    await beginTransaction();
+
     const isPromo = process.env.LAUNCH_UNLIMITED_CREDITS !== "false";
     const initialCredits = isPromo ? 999 : 3;
     const initialSubStatus = isPromo ? "active" : "none";
@@ -19,9 +21,12 @@ const createUser = async (name, email, password, phoneNumber) => {
       initialCredits,
       initialSubStatus,
     ]);
+
+    await commitTransaction();
     return result;
   } catch (error) {
-    console.log("creation of user failed");
+    console.error("User creation failed, rolling back transaction:", error?.message || error);
+    await rollBackTransaction();
     throw error;
   }
 };

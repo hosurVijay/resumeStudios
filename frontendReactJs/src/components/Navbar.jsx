@@ -72,6 +72,21 @@ export default function Navbar() {
         <BrandLogo to="/" showSubtitle={true} size="md" />
 
         <div className="flex items-center gap-1.5 sm:gap-3">
+          {/* Theme Toggle Button (Light/Dark Mode) */}
+          <button
+            type="button"
+            onClick={() => dispatch(toggleTheme())}
+            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80 transition-all cursor-pointer shrink-0"
+          >
+            {isDark ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+            )}
+          </button>
+
           {status && userData ? (
             <>
               {/* 1. Home - Hidden on mobile, accessible via BrandLogo or avatar dropdown */}

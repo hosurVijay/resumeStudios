@@ -4,7 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { User, Mail, Lock, Phone, ArrowRight, AlertCircle, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
 import { login } from "../store/authSlice.js";
 import { api } from "../api/client.js";
-import OtpModal from "../components/OtpModal.jsx";
 import BrandLogo from "../components/BrandLogo.jsx";
 import { toast } from "../components/Toast.jsx";
 
@@ -22,8 +21,6 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showOtpModal, setShowOtpModal] = useState(false);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -36,18 +33,17 @@ export default function Register() {
 
     try {
       const response = await api.post("/users/register", formData);
-      const data = response.data?.data;
+      const userPayload = response.data?.data?.user || response.data?.data;
 
-      // If user was auto-logged in (e.g. cloud host firewalled SMTP or matching user recovery)
-      if (data?.user && data?.requiresOtp === false) {
-        dispatch(login(data.user));
-        toast.success(response.data?.message || "Welcome to ResumeStudio! Your account is ready.");
+      if (userPayload) {
+        dispatch(login(userPayload));
+        toast.success("Welcome to ResumeStudio! Your account is ready.");
         navigate("/dashboard");
         return;
       }
 
-      toast.info("Verification code sent to your email.");
-      setShowOtpModal(true);
+      toast.success("Account created successfully!");
+      navigate("/dashboard");
     } catch (err) {
       const msg = err.response?.data?.message || "Registration failed. Please try again.";
       setError(msg);
@@ -55,36 +51,6 @@ export default function Register() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleVerifyOtp = async (otpCode) => {
-    setVerifyingOtp(true);
-    setError("");
-
-    try {
-      const response = await api.post("/users/verify-registration-otp", {
-        email: formData.email,
-        otp: otpCode,
-      });
-
-      const userPayload = response.data?.data?.user || response.data?.data;
-      dispatch(login(userPayload));
-      toast.success("Account created and verified! Welcome to ResumeStudio.");
-      setShowOtpModal(false);
-      navigate("/dashboard");
-    } catch (err) {
-      const msg = err.response?.data?.message || "Invalid OTP code. Please try again.";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    try {
-      await api.post("/users/register", formData);
-    } catch {}
   };
 
   return (
@@ -207,11 +173,11 @@ export default function Register() {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Sending OTP...</span>
+                <span>Creating account...</span>
               </>
             ) : (
               <>
-                <span>Continue with Email Verification</span>
+                <span>Create Account</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -234,16 +200,6 @@ export default function Register() {
         <ShieldCheck className="w-3.5 h-3.5 text-[#0F4C3A] dark:text-emerald-400" />
         <span>No credit card required · 100% In-memory evaluation · Safe for background checks</span>
       </div>
-
-      {showOtpModal && (
-        <OtpModal
-          email={formData.email}
-          onVerify={handleVerifyOtp}
-          onResend={handleResendOtp}
-          onClose={() => setShowOtpModal(false)}
-          isSubmitting={verifyingOtp}
-        />
-      )}
     </div>
   );
 }

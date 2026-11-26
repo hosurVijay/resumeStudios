@@ -1,18 +1,20 @@
 import { createSlice } from "@reduxjs/toolkit";
 
+const THEME_STORAGE_KEY = "resumestudio_theme";
+
 const getInitialTheme = () => {
   if (typeof window !== "undefined") {
-    const saved = localStorage.getItem("theme");
-    if (saved) {
-      document.documentElement.classList.toggle("dark", saved === "dark");
-      return saved;
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    // If user explicitly chose and saved "dark", honor it
+    if (saved === "dark") {
+      document.documentElement.classList.add("dark");
+      return "dark";
     }
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const defaultTheme = prefersDark ? "dark" : "light";
-    document.documentElement.classList.toggle("dark", defaultTheme === "dark");
-    return defaultTheme;
+    // Default is 100% LIGHT mode
+    document.documentElement.classList.remove("dark");
+    return "light";
   }
-  return "dark";
+  return "light";
 };
 
 const initialState = {
@@ -26,15 +28,25 @@ const themeSlice = createSlice({
     toggleTheme: (state) => {
       state.mode = state.mode === "dark" ? "light" : "dark";
       if (typeof window !== "undefined") {
+        localStorage.setItem(THEME_STORAGE_KEY, state.mode);
         localStorage.setItem("theme", state.mode);
-        document.documentElement.classList.toggle("dark", state.mode === "dark");
+        if (state.mode === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
       }
     },
     setTheme: (state, action) => {
-      state.mode = action.payload;
+      state.mode = action.payload === "dark" ? "dark" : "light";
       if (typeof window !== "undefined") {
+        localStorage.setItem(THEME_STORAGE_KEY, state.mode);
         localStorage.setItem("theme", state.mode);
-        document.documentElement.classList.toggle("dark", state.mode === "dark");
+        if (state.mode === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
       }
     },
   },

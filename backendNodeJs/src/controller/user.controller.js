@@ -113,7 +113,7 @@ export const registerUser = asyncHandler(async (req, res) => {
 
   const existUser = await findUserByEmail(email);
   if (existUser) {
-    // If user already exists (e.g. from an earlier interrupted signup) and password matches, log them in seamlessly!
+    // If user already exists and password matches, sign them in directly!
     const isPassValid = await isPasswordCorrect(password, existUser.password_hash);
     if (isPassValid) {
       const { accessToken, refreshToken } = await generateAccessRefreshToken(existUser.id);
@@ -141,35 +141,7 @@ export const registerUser = asyncHandler(async (req, res) => {
   const result = await createUser(name, email, hashedPassword, phoneNumber || null);
   const userId = result.insertId;
 
-  const rawOtp = generateOtp();
-  const otpHash = await hashPassword(rawOtp);
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-  await createPasswordReset(userId, otpHash, expiresAt);
-
-  let mailDelivered = false;
-  try {
-    await sendMailOtp(email, rawOtp);
-    mailDelivered = true;
-  } catch (mailError) {
-    console.warn(
-      "Outbound email could not be sent (Render free tier blocks SMTP port 587):",
-      mailError?.message || mailError
-    );
-  }
-
-  // 1. If email was delivered successfully, require OTP verification
-  if (mailDelivered) {
-    return res.status(201).json(
-      new ApiResponse(
-        201,
-        "Account created. A verification OTP has been sent to your email.",
-        { email, userId, requiresOtp: true }
-      )
-    );
-  }
-
-  // 2. Fail-safe for cloud hosts blocking outbound SMTP: Auto-verify and log the user in directly!
+  // Instant Launch Mode: Direct session activation (no email delivery wait times)
   const { accessToken, refreshToken } = await generateAccessRefreshToken(userId);
 
   res.cookie("accessToken", accessToken, {
@@ -404,8 +376,16 @@ export const resetPassword = asyncHandler(async (req, res) => {
 
     await markOTPused(otpUserRecord.id);
     userId = user.id;
+  }
+  // Option C: Direct email and newPassword (instant reset mode without OTP)
+  else if (email) {
+    const user = await findUserByEmail(email.trim().toLowerCase());
+    if (!user) {
+      throw new ApiError(404, "No account found with this email address.");
+    }
+    userId = user.id;
   } else {
-    throw new ApiError(400, "Either a reset token or email and OTP are required.");
+    throw new ApiError(400, "Account email and new password are required.");
   }
 
   const hashedPassword = await hashPassword(newPassword);
